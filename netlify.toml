@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  # IMPORTANT: Do not set 'publish' directory here
+  # The @netlify/plugin-nextjs automatically handles the .next directory
+  # If you have a publish directory set in Netlify UI, remove it from site settings
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NODE_VERSION = "18"
+
