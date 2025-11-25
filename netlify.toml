@@ -1,11 +1,13 @@
 [build]
   command = "npm run build"
-  # The @netlify/plugin-nextjs outputs to .netlify/output/public
-  publish = ".netlify/output/public"
+  # Plugin will process .next and create .netlify/output/public
+  # Do not set publish - let plugin manage it
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
   NODE_VERSION = "20"
+  # Ensure plugin can find Next.js build output
+  NEXT_TELEMETRY_DISABLED = "1"
 
