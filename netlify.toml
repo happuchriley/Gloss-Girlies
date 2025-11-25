@@ -1,7 +1,6 @@
 [build]
   command = "npm run build"
-  # The plugin creates .netlify/output/public during its build process
-  # We need to set this explicitly to prevent Netlify from defaulting to repo root
+  # Plugin will populate .netlify/output/public (created by postbuild script)
   publish = ".netlify/output/public"
 
 [[plugins]]
