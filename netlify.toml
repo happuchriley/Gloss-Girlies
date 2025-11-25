@@ -1,13 +1,13 @@
 [build]
   command = "npm run build"
-  # Plugin will process .next and create .netlify/output/public
-  # Do not set publish - let plugin manage it
+  # The plugin creates .netlify/output/public during its build process
+  # We need to set this explicitly to prevent Netlify from defaulting to repo root
+  publish = ".netlify/output/public"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
   NODE_VERSION = "20"
-  # Ensure plugin can find Next.js build output
   NEXT_TELEMETRY_DISABLED = "1"
 
