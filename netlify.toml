@@ -1,8 +1,7 @@
 [build]
   command = "npm run build"
-  # Plugin will populate .netlify/output/public
-  # postbuild script creates the directory structure on Netlify only
-  publish = ".netlify/output/public"
+  # Do NOT set publish directory - let plugin handle it completely
+  # The plugin manages .netlify/output/public internally
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

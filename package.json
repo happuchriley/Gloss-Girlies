@@ -6,7 +6,6 @@
     "dev": "next dev -p 3000",
     "dev:alt": "next dev -p 3001",
     "build": "next build",
-    "postbuild": "node -e \"if(process.env.NETLIFY){require('fs').mkdirSync('.netlify/output/public',{recursive:true})}\"",
     "start": "next start",
     "lint": "next lint",
     "verify-supabase": "node scripts/verify-supabase.js"
