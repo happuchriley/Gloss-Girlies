@@ -1,7 +1,8 @@
 [build]
   command = "npm run build"
-  # Do not set publish directory - @netlify/plugin-nextjs handles it automatically
-  # The plugin will create and populate .netlify/output/public
+  # Override UI setting - plugin will create and populate this directory
+  # Setting this in netlify.toml overrides the UI setting (which is set to "build")
+  publish = ".netlify/output/public"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
