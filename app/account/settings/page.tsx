@@ -164,7 +164,6 @@ export default function AccountSettingsPage() {
           <div className="mb-4">
             <BackButton label="Back to Account" />
           </div>
-          </Link>
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Account Settings</h1>
         </div>
 

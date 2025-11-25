@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useProductStore } from '@/store/productStore'
 import { useCartStore } from '@/store/cartStore'
@@ -8,7 +8,7 @@ import { FiShoppingCart } from 'react-icons/fi'
 import Link from 'next/link'
 import BackButton from '@/components/BackButton'
 
-export default function SearchPage() {
+function SearchContent() {
   const searchParams = useSearchParams()
   const query = searchParams.get('q') || ''
   const { products, initializeProducts } = useProductStore()
@@ -94,6 +94,21 @@ export default function SearchPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8">Search Products</h1>
+        <div className="text-center py-16">
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      </div>
+    }>
+      <SearchContent />
+    </Suspense>
   )
 }
 

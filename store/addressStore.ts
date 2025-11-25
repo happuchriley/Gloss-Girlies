@@ -60,6 +60,7 @@ export const useAddressStore = create<AddressStore>()((set, get) => ({
                 addressLine2: addr.address_line2 || undefined,
                 city: addr.city || '',
                 state: addr.state || undefined,
+                pincode: addr.pincode || undefined,
                 country: addr.country || 'Ghana',
                 isDefault: Boolean(addr.is_default),
               }))
@@ -77,6 +78,7 @@ export const useAddressStore = create<AddressStore>()((set, get) => ({
       addAddress: async (address) => {
         const { user, isAuthenticated } = useAuthStore.getState()
         const isFirstAddress = get().addresses.length === 0
+        let newAddress: ShippingAddress & { id: string; label: string; isDefault: boolean }
         
         // If authenticated and Supabase configured, save to database
         if (isAuthenticated && user && isSupabaseConfigured()) {
@@ -101,6 +103,7 @@ export const useAddressStore = create<AddressStore>()((set, get) => ({
                 address_line2: address.addressLine2 || null,
                 city: address.city,
                 state: address.state || null,
+                pincode: address.pincode || null,
                 country: address.country || 'Ghana',
                 is_default: isFirstAddress,
               })
@@ -113,7 +116,7 @@ export const useAddressStore = create<AddressStore>()((set, get) => ({
             }
             
             // Create newAddress with database ID
-            const newAddress = {
+            newAddress = {
               ...address,
               id: data.id,
               isDefault: isFirstAddress,
@@ -121,6 +124,13 @@ export const useAddressStore = create<AddressStore>()((set, get) => ({
           } catch (error) {
             console.error('Error adding address:', error)
             return false
+          }
+        } else {
+          // Create newAddress without database (local only)
+          newAddress = {
+            ...address,
+            id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            isDefault: isFirstAddress,
           }
         }
         
@@ -144,6 +154,7 @@ export const useAddressStore = create<AddressStore>()((set, get) => ({
             if (updates.addressLine2 !== undefined) updateData.address_line2 = updates.addressLine2 || null
             if (updates.city) updateData.city = updates.city
             if (updates.state !== undefined) updateData.state = updates.state || null
+            if (updates.pincode !== undefined) updateData.pincode = updates.pincode || null
             if (updates.country) updateData.country = updates.country
             
             const { error } = await supabase
@@ -249,12 +260,9 @@ export const useAddressStore = create<AddressStore>()((set, get) => ({
 
 // Initialize addresses when user logs in
 if (typeof window !== 'undefined') {
-  useAuthStore.subscribe(
-    (state) => state.isAuthenticated,
-    (isAuthenticated) => {
-      if (isAuthenticated) {
-        useAddressStore.getState().initializeAddresses()
-      }
+  useAuthStore.subscribe((state) => {
+    if (state.isAuthenticated) {
+      useAddressStore.getState().initializeAddresses()
     }
-  )
+  })
 }

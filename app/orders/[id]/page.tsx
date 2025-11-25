@@ -58,18 +58,23 @@ export default function OrderDetailPage() {
     }
   }
 
-  const handleCancelOrder = () => {
+  const handleCancelOrder = async () => {
     if (!user) return
     
     if (confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
       setIsCancelling(true)
-      const success = cancelOrder(order.id, user.id)
-      if (success) {
-        alert('Order cancelled successfully')
-      } else {
-        alert('Cannot cancel this order. It may have already been shipped or delivered.')
+      try {
+        const success = await cancelOrder(order.id, user.id)
+        if (success) {
+          alert('Order cancelled successfully')
+        } else {
+          alert('Cannot cancel this order. It may have already been shipped or delivered.')
+        }
+      } catch (error) {
+        alert('An error occurred while cancelling the order. Please try again.')
+      } finally {
+        setIsCancelling(false)
       }
-      setIsCancelling(false)
     }
   }
 

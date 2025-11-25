@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { FiStar, FiImage, FiVideo, FiSend } from 'react-icons/fi'
 import { useProductStore } from '@/store/productStore'
@@ -8,7 +8,7 @@ import { useReviewStore } from '@/store/reviewStore'
 import { useAuthStore } from '@/store/authStore'
 import { formatDate } from '@/lib/dateUtils'
 
-export default function ReviewsPage() {
+function ReviewsContent() {
   const searchParams = useSearchParams()
   const { products, initializeProducts } = useProductStore()
   const { reviews, addReview, getReviewsByProduct } = useReviewStore()
@@ -51,7 +51,7 @@ export default function ReviewsPage() {
     })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedProduct || rating === 0 || !comment.trim()) {
       alert('Please fill in all required fields')
@@ -63,24 +63,27 @@ export default function ReviewsPage() {
       return
     }
 
-    addReview({
+    const success = await addReview({
       productId: selectedProduct,
       userId: user.id,
-      userName: user.name,
       rating,
       comment,
       images: imagePreviews,
       videos: videoPreviews,
     })
 
-    setSelectedProduct('')
-    setRating(0)
-    setComment('')
-    setImages([])
-    setVideos([])
-    setImagePreviews([])
-    setVideoPreviews([])
-    alert('Review submitted successfully!')
+    if (success) {
+      setSelectedProduct('')
+      setRating(0)
+      setComment('')
+      setImages([])
+      setVideos([])
+      setImagePreviews([])
+      setVideoPreviews([])
+      alert('Review submitted successfully!')
+    } else {
+      alert('Failed to submit review. You may have already reviewed this product.')
+    }
   }
 
   const removeImage = (index: number) => {
@@ -313,7 +316,6 @@ export default function ReviewsPage() {
                           controls
                           preload="metadata"
                           playsInline
-                          loading="lazy"
                           disablePictureInPicture
                           controlsList="nodownload"
                         />
@@ -374,7 +376,6 @@ export default function ReviewsPage() {
                         controls
                         preload="metadata"
                         playsInline
-                        loading="lazy"
                         disablePictureInPicture
                         controlsList="nodownload"
                       />
@@ -387,6 +388,21 @@ export default function ReviewsPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function ReviewsPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 md:py-8">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 md:mb-8">Product Reviews</h1>
+        <div className="text-center py-16">
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      </div>
+    }>
+      <ReviewsContent />
+    </Suspense>
   )
 }
 

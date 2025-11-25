@@ -10,6 +10,7 @@ export interface ShippingAddress {
   addressLine2?: string
   city: string
   state?: string
+  pincode?: string
   country: string
 }
 
@@ -212,7 +213,7 @@ export const useOrderStore = create<OrderStore>()((set, get) => ({
             }
             
             // Validate products exist before creating order items
-            const productIds = [...new Set((order.items || []).map(item => item.id).filter(Boolean))]
+            const productIds = Array.from(new Set((order.items || []).map(item => item.id).filter(Boolean)))
             if (productIds.length > 0) {
               const { data: existingProducts, error: productsError } = await supabase
                 .from('products')
@@ -378,12 +379,9 @@ export const useOrderStore = create<OrderStore>()((set, get) => ({
 
 // Initialize orders when user logs in
 if (typeof window !== 'undefined') {
-  useAuthStore.subscribe(
-    (state) => state.isAuthenticated,
-    (isAuthenticated) => {
-      if (isAuthenticated) {
-        useOrderStore.getState().initializeOrders()
-      }
+  useAuthStore.subscribe((state) => {
+    if (state.isAuthenticated) {
+      useOrderStore.getState().initializeOrders()
     }
-  )
+  })
 }

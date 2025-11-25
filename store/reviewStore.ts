@@ -54,7 +54,7 @@ export const useReviewStore = create<ReviewStore>()((set, get) => ({
           
           if (data) {
             // Fetch user names separately since PostgREST doesn't support nested queries easily
-            const userIds = [...new Set((data || []).map((r: any) => r.user_id).filter(Boolean))]
+            const userIds = Array.from(new Set((data || []).map((r: any) => r.user_id).filter(Boolean)))
             const userNamesMap: Record<string, string> = {}
             
             if (userIds.length > 0) {

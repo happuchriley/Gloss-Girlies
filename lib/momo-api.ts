@@ -21,6 +21,7 @@ export interface MoMoPaymentRequest {
   notifyUrl: string
   extraData?: string
   requestType?: string
+  signature?: string
 }
 
 export interface MoMoPaymentResponse {
@@ -44,6 +45,7 @@ export interface MoMoQueryRequest {
   requestId: string
   orderId: string
   requestType: string
+  signature?: string
 }
 
 export interface MoMoQueryResponse {

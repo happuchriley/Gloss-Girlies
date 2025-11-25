@@ -447,13 +447,16 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
           // Clear cart from database in background (don't wait for it)
           if (wasAuthenticated && currentUser && isSupabaseConfigured()) {
             // Fire and forget - don't block logout
-            supabase
-              .from('cart_items')
-              .delete()
-              .eq('user_id', currentUser.id)
-              .catch((error) => {
+            ;(async () => {
+              try {
+                await supabase
+                  .from('cart_items')
+                  .delete()
+                  .eq('user_id', currentUser.id)
+              } catch (error) {
                 console.error('Error clearing cart during logout (non-blocking):', error)
-              })
+              }
+            })()
           }
           
           // Sign out from Supabase (with timeout to prevent hanging)
