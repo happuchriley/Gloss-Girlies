@@ -1,7 +1,7 @@
 [build]
   command = "npm run build"
-  # Override UI setting - plugin will create and populate this directory
-  # Setting this in netlify.toml overrides the UI setting (which is set to "build")
+  # Plugin will populate .netlify/output/public
+  # postbuild script creates the directory structure on Netlify only
   publish = ".netlify/output/public"
 
 [[plugins]]
