@@ -1,7 +1,19 @@
+const path = require('path')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: true,
+  allowedDevOrigins: ['192.168.43.235'],
+  turbopack: {
+    root: path.join(__dirname),
+  },
   images: {
-    domains: ['media6.ppl-media.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+      },
+    ],
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
@@ -24,13 +36,13 @@ const nextConfig = {
   },
   // Production optimizations
   productionBrowserSourceMaps: false,
-  // Disable HTTP/2 if causing issues
+  // Keep sockets alive for better throughput under load
   httpAgentOptions: {
-    keepAlive: false,
+    keepAlive: true,
   },
   // Security: Hide x-powered-by header
   poweredByHeader: false,
-  // Add security and cache headers
+  // Add security headers (avoid custom cache-control on Next internals)
   async headers() {
     return [
       {
@@ -38,45 +50,37 @@ const nextConfig = {
         source: '/:path*',
         headers: [
           {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
           },
-        ],
-      },
-      {
-        // Cache control for HTML pages (exclude static assets)
-        source: '/',
-        headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=3600, s-maxage=3600',
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
           },
-        ],
-      },
-      {
-        source: '/images/:path*',
-        headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=()',
           },
-        ],
-      },
-      {
-        source: '/_next/static/:path*',
-        headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin',
           },
-        ],
-      },
-      {
-        source: '/_next/image/:path*',
-        headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            key: 'Cross-Origin-Resource-Policy',
+            value: 'same-site',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value:
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
           },
         ],
       },

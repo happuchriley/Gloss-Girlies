@@ -1,139 +1,115 @@
-# Database Setup Guide
+# Supabase Backend Setup
 
-## Step 1: Verify Your Supabase Project
+One SQL file sets up the full Gloss Girlies backend: auth profiles, products, cart, guest checkout, Paystack payments, wishlist, inventory tracking, categories, and blog.
 
-Your Supabase project reference is: `hddiuzsxrgneysrnzgbc`
+## Prerequisites
 
-Your Supabase URL should be:
-```
-https://hddiuzsxrgneysrnzgbc.supabase.co
-```
+Create `.env.local` from `.env.example` with:
 
-Make sure your `.env.local` has:
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://hddiuzsxrgneysrnzgbc.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkZGl1enN4cmduZXlzcm56Z2NiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2NTcyMDksImV4cCI6MjA3OTIzMzIwOX0.KMku5zDz7Xq6eSyi_6ctOiETIphz_Dfv5rP68Eu4iN4
+NEXT_PUBLIC_SUPABASE_URL=https://zeyvvnviontbfnkhdhqm.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
-## Step 2: Access Your Supabase Dashboard
+Project reference: `zeyvvnviontbfnkhdhqm`
 
-1. Go to [https://supabase.com/dashboard](https://supabase.com/dashboard)
-2. Log in to your account
-3. Find your project (reference: `hddiuzsxrgneysrnzgbc`)
-4. Click on it to open the dashboard
+Find keys in [Supabase Dashboard](https://supabase.com/dashboard) → your project → **Settings** → **API**.
 
-## Step 3: Run the Database Schema
+## Step 1: Run the backend SQL
 
-1. In your Supabase dashboard, click on **"SQL Editor"** in the left sidebar
-2. Click **"New query"** button
-3. Open the file `supabase/schema.sql` from this project
-4. **Copy ALL the contents** of `supabase/schema.sql`
-5. **Paste** it into the SQL Editor
-6. Click **"Run"** (or press Ctrl+Enter / Cmd+Enter)
-7. You should see: **"Success. No rows returned"**
+1. Open **SQL Editor** in your Supabase project
+2. Click **New query**
+3. Copy the full contents of **`supabase/backend.sql`**
+4. Paste and click **Run**
 
-## Step 4: Verify Tables Were Created
+You should see: **Success. No rows returned**
 
-1. In Supabase dashboard, go to **"Table Editor"** in the left sidebar
-2. You should see these tables:
-   - ✅ `users`
-   - ✅ `products`
-   - ✅ `cart_items`
-   - ✅ `orders`
-   - ✅ `order_items`
-   - ✅ `addresses`
-   - ✅ `reviews`
+This file is idempotent — safe to re-run if you already applied older `schema.sql` or migration files.
 
-## Step 5: Create Admin User
+## Step 2: Verify tables
 
-1. Go to **"Authentication"** → **"Users"** in the left sidebar
-2. Click **"Add user"** → **"Create new user"**
-3. Enter:
-   - **Email**: `admin@glossgirlies.com`
-   - **Password**: (choose a strong password)
-   - **Auto Confirm User**: ✅ (check this)
-4. Click **"Create user"**
-5. Copy the user's **UUID** (you'll see it in the user list)
-
-6. Go back to **"SQL Editor"**
-7. Run this SQL (replace `USER_UUID_HERE` with the actual UUID):
-
-```sql
--- Create admin user profile
-INSERT INTO public.users (id, email, name, role)
-VALUES (
-  'USER_UUID_HERE',
-  'admin@glossgirlies.com',
-  'Admin',
-  'admin'
-)
-ON CONFLICT (id) DO UPDATE
-SET role = 'admin';
+```bash
+npm run verify-supabase
 ```
 
-Or if the user already exists in auth.users:
+Expected tables:
+
+| Table | Purpose |
+|-------|---------|
+| `users` | Profiles linked to `auth.users` |
+| `products` | Product catalog |
+| `cart_items` | Signed-in shopping carts |
+| `addresses` | Saved shipping addresses |
+| `orders` | Orders (registered + guest) |
+| `order_items` | Line items per order |
+| `reviews` | Product reviews |
+| `wishlist` | Saved products per user |
+| `payments` | Paystack payment records |
+| `inventory_movements` | Stock change audit log |
+| `shop_categories` | Admin-managed categories |
+| `blog_posts` | Blog content |
+
+## Step 3: Seed demo accounts
+
+```bash
+npm run seed:demo-users
+```
+
+Creates:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Customer | `demo@glossgirlies.com` | `Demo123!` |
+| Admin | `admin@glossgirlies.com` | `Admin123!` |
+
+Requires `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`.
+
+## Step 4: Start the app
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Manual admin setup (alternative to seed script)
+
+1. **Authentication** → **Users** → **Add user**
+2. Email: `admin@glossgirlies.com`, auto-confirm enabled
+3. In SQL Editor:
 
 ```sql
 INSERT INTO public.users (id, email, name, role)
 SELECT id, email, 'Admin', 'admin'
 FROM auth.users
 WHERE email = 'admin@glossgirlies.com'
-ON CONFLICT (id) DO UPDATE
-SET role = 'admin';
+ON CONFLICT (id) DO UPDATE SET role = 'admin';
 ```
-
-## Step 6: Test the Connection
-
-1. Restart your Next.js dev server:
-   ```bash
-   npm run dev
-   ```
-
-2. Open [http://localhost:3000](http://localhost:3000)
-
-3. Try to:
-   - Register a new user account
-   - Login with the admin account
-   - Browse products
-   - Add items to cart
 
 ## Troubleshooting
 
-### "Row Level Security policy violation"
-- Make sure you ran the complete `schema.sql` file
-- Check that RLS policies are enabled in Table Editor → Settings
+### `Error fetching categories` / missing `shop_categories`
 
-### "User not found"
-- Make sure the user exists in `auth.users`
-- Run the SQL to create the user profile in `public.users`
+Run `supabase/backend.sql` in the SQL Editor, then `npm run verify-supabase`.
 
-### "Table does not exist"
-- Go back to SQL Editor and run `schema.sql` again
-- Check for any errors in the SQL execution
+### Row Level Security policy violation
+
+Re-run `supabase/backend.sql` — it refreshes all RLS policies.
+
+### Table does not exist
+
+Confirm you ran the full `backend.sql` file (not an older `schema.sql` only).
 
 ### Connection errors
-- Verify your `.env.local` has the correct URL and key
-- Make sure you restarted the dev server after creating `.env.local`
-- Check Supabase dashboard to ensure project is active
 
-## What Gets Created
+Check `.env.local` URL and keys, then restart `npm run dev`.
 
-The schema creates:
-- ✅ 7 database tables
-- ✅ Row Level Security (RLS) policies
-- ✅ Indexes for performance
-- ✅ Foreign key relationships
-- ✅ Auto-updating timestamps
-- ✅ Unique constraints
+## File reference
 
-## Next Steps
-
-After setup:
-1. ✅ Test user registration
-2. ✅ Test product browsing
-3. ✅ Test cart functionality
-4. ✅ Test order creation
-5. ✅ Test admin features
-
-Your Supabase backend is now ready! 🚀
-
+| File | Use |
+|------|-----|
+| **`supabase/backend.sql`** | **Run this** — complete backend |
+| `supabase/migrations/*.sql` | Historical migrations (included in `backend.sql`) |
+| `supabase/complete-schema.sql` | Legacy base schema |
+| `scripts/seed-demo-users.js` | Demo customer + admin accounts |

@@ -1,114 +1,121 @@
-'use client'
+"use client"
 
-import { useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useProductStore } from '@/store/productStore'
-import { useCartStore } from '@/store/cartStore'
-import { FiShoppingCart } from 'react-icons/fi'
-import Link from 'next/link'
-import BackButton from '@/components/BackButton'
+import { Suspense, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { Search } from "lucide-react"
+
+import { useProductCatalog } from "@/hooks/use-product-catalog"
+import { getUniqueBrands } from "@/lib/products/filters"
+import type { SortOption } from "@/lib/products/types"
+import { ProductGrid } from "@/components/products/product-grid"
+import { ProductFiltersBar } from "@/components/products/product-filters"
+import { ShopPageHeader } from "@/components/shop/shop-page-header"
+import { PageTransition } from "@/components/layout/page-transition"
+import { SearchBar } from "@/components/layout/search-bar"
+import BackButton from "@/components/BackButton"
+import { Button } from "@/components/ui/button"
 
 function SearchContent() {
   const searchParams = useSearchParams()
-  const query = searchParams.get('q') || ''
-  const { products, initializeProducts } = useProductStore()
-  const addItem = useCartStore((state) => state.addItem)
+  const query = searchParams.get("q") || ""
 
-  useEffect(() => {
-    initializeProducts()
-  }, [initializeProducts])
+  const [sort, setSort] = useState<SortOption>("featured")
+  const [brand, setBrand] = useState("")
+  const [minPrice, setMinPrice] = useState("")
+  const [maxPrice, setMaxPrice] = useState("")
 
-  const filteredProducts = query
-    ? (products || []).filter(
-        (product) =>
-          product &&
-          (product.name?.toLowerCase().includes(query.toLowerCase()) ||
-          product.brand?.toLowerCase().includes(query.toLowerCase()) ||
-          product.category?.toLowerCase().includes(query.toLowerCase()) ||
-          product.description?.toLowerCase().includes(query.toLowerCase()))
-      )
-    : []
+  const { products, allProducts, loading } = useProductCatalog({
+    query,
+    brand: brand || undefined,
+    minPrice: minPrice ? Number(minPrice) : undefined,
+    maxPrice: maxPrice ? Number(maxPrice) : undefined,
+    sort,
+    inStockOnly: true,
+  })
 
-  const handleAddToCart = (e: React.MouseEvent, product: typeof products[0]) => {
-    e.preventDefault()
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.image,
-    })
+  const brands = useMemo(() => getUniqueBrands(allProducts), [allProducts])
+
+  const clearFilters = () => {
+    setSort("featured")
+    setBrand("")
+    setMinPrice("")
+    setMaxPrice("")
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">
-        {query ? `Search Results for "${query}"` : 'Search Products'}
-      </h1>
+    <PageTransition className="container-app py-6 md:py-10">
+      <BackButton />
+
+      <div className="mt-6">
+        <ShopPageHeader
+          eyebrow="Search"
+          title={query ? `Results for “${query}”` : "Find your next favorite"}
+          subtitle={
+            query
+              ? loading
+                ? "Searching the collection…"
+                : `${products.length} product${products.length === 1 ? "" : "s"} found`
+              : "Search skincare, makeup, haircare, and more."
+          }
+        />
+      </div>
+
+      <div className="mt-6 max-w-xl">
+        <SearchBar placeholder="Search products, brands, categories…" />
+      </div>
 
       {!query ? (
-        <div className="text-center py-16">
-          <p className="text-gray-500">Enter a search term to find products</p>
-        </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-gray-500 mb-4">No products found for "{query}"</p>
-          <Link
-            href="/"
-            className="text-pink-600 hover:underline"
-          >
-            Continue Shopping
-          </Link>
+        <div className="mt-10 rounded-3xl border border-dashed border-pink-200 bg-pink-50/40 px-6 py-16 text-center">
+          <Search className="mx-auto h-10 w-10 text-pink-300" />
+          <p className="mt-4 text-neutral-600">Type a product name or brand above to start.</p>
+          <Button className="mt-6 rounded-full" variant="outline" asChild>
+            <Link href="/categories">Browse all categories</Link>
+          </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {(filteredProducts || []).map((product) => (
-            <Link
-              key={product.id}
-              href={`/products/${product.id}`}
-              className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="aspect-square relative">
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="p-4">
-                <p className="text-xs text-gray-500 mb-1">{product.brand}</p>
-                <h3 className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">
-                  {product.name}
-                </h3>
-                <div className="flex items-center justify-between">
-                  <p className="text-lg font-bold text-gray-900">₵{product.price}</p>
-                  <button
-                    onClick={(e) => handleAddToCart(e, product)}
-                    className="bg-pink-600 text-white p-2 rounded-full hover:bg-pink-700 transition-colors"
-                  >
-                    <FiShoppingCart className="text-sm" />
-                  </button>
-                </div>
-              </div>
-            </Link>
-          ))}
+        <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">
+          <ProductFiltersBar
+            sort={sort}
+            onSortChange={setSort}
+            brand={brand}
+            brands={brands}
+            onBrandChange={setBrand}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            onMinPriceChange={setMinPrice}
+            onMaxPriceChange={setMaxPrice}
+            onClear={clearFilters}
+            className="hidden rounded-2xl border-pink-100 bg-pink-50/30 lg:block"
+          />
+          <div>
+            <ProductGrid
+              products={products}
+              loading={loading}
+              emptyMessage={`No products found for “${query}”.`}
+            />
+            {!loading && products.length === 0 && (
+              <Button className="mt-6 rounded-full" asChild>
+                <Link href="/categories">Browse categories</Link>
+              </Button>
+            )}
+          </div>
         </div>
       )}
-    </div>
+    </PageTransition>
   )
 }
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Search Products</h1>
-        <div className="text-center py-16">
-          <p className="text-gray-500">Loading...</p>
+    <Suspense
+      fallback={
+        <div className="container-app py-12">
+          <div className="h-32 animate-pulse rounded-3xl bg-pink-50" />
         </div>
-      </div>
-    }>
+      }
+    >
       <SearchContent />
     </Suspense>
   )
 }
-

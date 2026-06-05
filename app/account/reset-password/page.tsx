@@ -1,207 +1,165 @@
-'use client'
+"use client"
 
-import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuthStore } from '@/store/authStore'
-import { supabase } from '@/lib/supabase'
-import { FiLock, FiCheckCircle, FiX } from 'react-icons/fi'
-import BackButton from '@/components/BackButton'
+import { Suspense, useEffect, useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { CheckCircle, Loader2, XCircle } from "lucide-react"
+
+import { AuthLayout } from "@/components/auth/auth-layout"
+import { useAuthStore } from "@/store/authStore"
+import { resetPasswordSchema } from "@/lib/auth/validation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 function ResetPasswordContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const { resetPassword } = useAuthStore()
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
+  const resetPassword = useAuthStore((s) => s.resetPassword)
+  const initialize = useAuthStore((s) => s.initialize)
+
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [isValidSession, setIsValidSession] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
 
   useEffect(() => {
-    // Check if we have a valid session from the reset link
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          setIsValidSession(true)
-        } else {
-          setError('Invalid or expired reset link. Please request a new password reset.')
+        const res = await fetch("/api/auth/session", { credentials: "same-origin" })
+        const data = (await res.json()) as { user: unknown }
+        setIsValidSession(!!data.user)
+        if (!data.user) {
+          setError("Invalid or expired reset link. Request a new password reset.")
         }
-      } catch (err) {
-        setError('Error validating reset link. Please try again.')
+      } catch {
+        setError("Error validating reset link. Please try again.")
       } finally {
         setCheckingSession(false)
       }
     }
 
-    checkSession()
+    void checkSession()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
+    setError("")
 
-    // Validation
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
+    const parsed = resetPasswordSchema.safeParse({ password, confirmPassword })
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Invalid input")
       return
     }
 
     setLoading(true)
+    const result = await resetPassword(
+      parsed.data.password,
+      parsed.data.confirmPassword
+    )
+    setLoading(false)
 
-    try {
-      const success = await resetPassword(password)
-      if (success) {
-        setSuccess(true)
-        // Redirect to login after 2 seconds
-        setTimeout(() => {
-          router.push('/account')
-        }, 2000)
-      } else {
-        setError('Failed to reset password. The link may have expired. Please request a new one.')
-      }
-    } catch (err) {
-      setError('An error occurred. Please try again.')
-    } finally {
-      setLoading(false)
+    if (!result.success) {
+      setError(result.error ?? "Failed to reset password.")
+      return
     }
+
+    setSuccess(true)
+    await initialize()
+    setTimeout(() => router.push("/account"), 2000)
   }
 
   if (checkingSession) {
     return (
-      <div className="container mx-auto px-2 sm:px-4 py-8 sm:py-12 md:py-16">
-        <div className="max-w-md mx-auto bg-white rounded-lg shadow-sm p-6 text-center">
-          <p className="text-gray-600">Validating reset link...</p>
+      <AuthLayout title="Reset password" subtitle="Validating your secure link…">
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-pink-600" />
         </div>
-      </div>
+      </AuthLayout>
     )
   }
 
   if (!isValidSession) {
     return (
-      <div className="container mx-auto px-2 sm:px-4 py-8 sm:py-12 md:py-16">
-        <div className="max-w-md mx-auto">
-          <BackButton />
-          <div className="bg-white rounded-lg shadow-sm p-6 mt-4">
-            <div className="text-center">
-              <FiX className="text-4xl text-red-500 mx-auto mb-4" />
-              <h1 className="text-xl font-bold mb-2">Invalid Reset Link</h1>
-              <p className="text-gray-600 mb-4">{error || 'This password reset link is invalid or has expired.'}</p>
-              <button
-                onClick={() => router.push('/account')}
-                className="bg-pink-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-pink-700 transition-colors"
-              >
-                Go to Login
-              </button>
-            </div>
-          </div>
+      <AuthLayout title="Link expired" subtitle="This reset link is no longer valid">
+        <div className="space-y-4 text-center">
+          <XCircle className="mx-auto h-10 w-10 text-destructive" />
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button className="w-full" asChild>
+            <Link href="/account?tab=forgot">Request new link</Link>
+          </Button>
         </div>
-      </div>
+      </AuthLayout>
     )
   }
 
   if (success) {
     return (
-      <div className="container mx-auto px-2 sm:px-4 py-8 sm:py-12 md:py-16">
-        <div className="max-w-md mx-auto">
-          <BackButton />
-          <div className="bg-white rounded-lg shadow-sm p-6 mt-4">
-            <div className="text-center">
-              <FiCheckCircle className="text-4xl text-green-500 mx-auto mb-4" />
-              <h1 className="text-xl font-bold mb-2">Password Reset Successful!</h1>
-              <p className="text-gray-600 mb-4">Your password has been reset. Redirecting to login...</p>
-            </div>
-          </div>
+      <AuthLayout title="Password updated" subtitle="You can sign in with your new password">
+        <div className="space-y-4 text-center">
+          <CheckCircle className="mx-auto h-10 w-10 text-emerald-600" />
+          <p className="text-sm text-muted-foreground">Redirecting to your account…</p>
         </div>
-      </div>
+      </AuthLayout>
     )
   }
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-8 sm:py-12 md:py-16">
-      <div className="max-w-md mx-auto">
-        <BackButton />
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 md:mb-8 text-center">
-          Reset Password
-        </h1>
+    <AuthLayout title="Choose a new password" subtitle="Enter a strong password for your account">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div
+            role="alert"
+            className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        )}
 
-        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                <FiLock className="inline mr-2" />
-                New Password
-              </label>
-              <input
-                type="password"
-                id="newPassword"
-                name="newPassword"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-                required
-                minLength={6}
-                placeholder="Enter new password"
-              />
-              <p className="text-xs text-gray-500 mt-1">Must be at least 6 characters</p>
-            </div>
-
-            <div>
-              <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm New Password
-              </label>
-              <input
-                type="password"
-                id="confirmNewPassword"
-                name="confirmNewPassword"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-                required
-                minLength={6}
-                placeholder="Confirm new password"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-pink-600 text-white py-3 rounded-lg font-medium hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <FiLock />
-              {loading ? 'Resetting...' : 'Reset Password'}
-            </button>
-          </form>
+        <div className="space-y-2">
+          <Label htmlFor="newPassword">New password</Label>
+          <Input
+            id="newPassword"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            required
+          />
         </div>
-      </div>
-    </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirmNewPassword">Confirm password</Label>
+          <Input
+            id="confirmNewPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+            required
+          />
+        </div>
+
+        <Button type="submit" className="w-full" size="lg" disabled={loading}>
+          {loading ? <Loader2 className="animate-spin" /> : "Update password"}
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="container mx-auto px-2 sm:px-4 py-8 sm:py-12 md:py-16">
-        <div className="max-w-md mx-auto bg-white rounded-lg shadow-sm p-6 text-center">
-          <p className="text-gray-600">Loading...</p>
+    <Suspense
+      fallback={
+        <div className="container-app flex justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-pink-600" />
         </div>
-      </div>
-    }>
+      }
+    >
       <ResetPasswordContent />
     </Suspense>
   )
 }
-

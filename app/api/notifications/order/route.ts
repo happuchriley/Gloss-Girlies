@@ -1,168 +1,96 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 
-interface OrderNotificationRequest {
-  type: 'customer' | 'admin'
-  orderId: string
-  customerName: string
-  customerEmail: string
-  orderTotal: number
-  orderItems: Array<{
-    name: string
-    quantity: number
-    price: number
-  }>
-  shippingAddress: {
-    fullName: string
-    addressLine1: string
-    addressLine2?: string
-    city: string
-    state?: string
-    country: string
-    phone: string
-  }
-  paymentMethod: string
-  trackingNumber?: string
-  estimatedDelivery?: string
-}
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit"
+import { dispatchOrderNotifications } from "@/lib/notifications/dispatch-order"
+
+const orderNotificationSchema = z.object({
+  type: z.enum(["customer", "admin"]),
+  orderId: z.string().min(1),
+  customerName: z.string().min(1),
+  customerEmail: z.string().email(),
+  customerPhone: z.string().optional(),
+  orderTotal: z.number(),
+  orderItems: z.array(
+    z.object({
+      name: z.string(),
+      quantity: z.number(),
+      price: z.number(),
+    })
+  ),
+  shippingAddress: z.object({
+    fullName: z.string(),
+    addressLine1: z.string(),
+    addressLine2: z.string().optional(),
+    city: z.string(),
+    state: z.string().optional(),
+    country: z.string(),
+    phone: z.string(),
+  }),
+  paymentMethod: z.string(),
+  trackingNumber: z.string().optional(),
+  estimatedDelivery: z.string().optional(),
+  sendSms: z.boolean().optional(),
+})
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request.headers)
+  const limiter = checkRateLimit(`notify-order:${ip}`, 20, 60_000)
+  if (!limiter.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429 }
+    )
+  }
+
   try {
-    const data: OrderNotificationRequest = await request.json()
+    const body = await request.json()
+    const parsed = orderNotificationSchema.safeParse(body)
 
-    // In a production environment, you would:
-    // 1. Send email via SMTP (using nodemailer, sendgrid, etc.)
-    // 2. Send SMS notifications
-    // 3. Send push notifications
-    // 4. Store notifications in database
-
-    // For now, we'll log the notification and return success
-    // You can integrate with email services like:
-    // - SendGrid
-    // - AWS SES
-    // - Resend
-    // - Nodemailer with SMTP
-
-    if (data.type === 'customer') {
-      console.log('📧 Customer Order Notification:', {
-        to: data.customerEmail,
-        subject: `Order Confirmation - Order #${data.orderId}`,
-        orderId: data.orderId,
-        total: data.orderTotal,
-        trackingNumber: data.trackingNumber,
-      })
-
-      // TODO: Implement actual email sending
-      // Example with a service like Resend:
-      // await resend.emails.send({
-      //   from: 'orders@glossgirlies.com',
-      //   to: data.customerEmail,
-      //   subject: `Order Confirmation - Order #${data.orderId}`,
-      //   html: generateCustomerEmailHTML(data),
-      // })
-    } else if (data.type === 'admin') {
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@glossgirlies.com'
-      
-      console.log('📧 Admin Order Notification:', {
-        to: adminEmail,
-        subject: `New Order Received - Order #${data.orderId}`,
-        orderId: data.orderId,
-        customer: data.customerName,
-        total: data.orderTotal,
-      })
-
-      // TODO: Implement actual email sending
-      // await resend.emails.send({
-      //   from: 'orders@glossgirlies.com',
-      //   to: adminEmail,
-      //   subject: `New Order Received - Order #${data.orderId}`,
-      //   html: generateAdminEmailHTML(data),
-      // })
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid notification payload", details: parsed.error.issues },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({ success: true })
+    const data = parsed.data
+    const phone =
+      data.customerPhone?.trim() || data.shippingAddress.phone?.trim()
+
+    const payload = {
+      orderId: data.orderId,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail,
+      customerPhone: phone,
+      orderTotal: data.orderTotal,
+      orderItems: data.orderItems,
+      shippingAddress: data.shippingAddress,
+      paymentMethod: data.paymentMethod,
+      trackingNumber: data.trackingNumber,
+      estimatedDelivery: data.estimatedDelivery,
+    }
+
+    let smsResult
+
+    if (data.type === "customer" && data.sendSms !== false) {
+      smsResult = await dispatchOrderNotifications(payload, {
+        smsEvent: "order_confirmed",
+        notifyAdminSms: true,
+      })
+    } else if (data.type === "admin") {
+      await dispatchOrderNotifications(payload, {})
+    }
+
+    return NextResponse.json({
+      success: true,
+      sms: smsResult?.sms,
+    })
   } catch (error) {
-    console.error('Error sending notification:', error)
+    console.error("Error sending notification:", error)
     return NextResponse.json(
-      { error: 'Failed to send notification' },
+      { error: "Failed to send notification" },
       { status: 500 }
     )
   }
 }
-
-// Helper function to generate customer email HTML (for future use)
-function generateCustomerEmailHTML(data: OrderNotificationRequest): string {
-  return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #db2777; color: white; padding: 20px; text-align: center; }
-          .content { padding: 20px; background: #f9f9f9; }
-          .order-details { background: white; padding: 15px; margin: 15px 0; border-radius: 5px; }
-          .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Order Confirmation</h1>
-          </div>
-          <div class="content">
-            <p>Dear ${data.customerName},</p>
-            <p>Thank you for your order! We've received your order and will process it shortly.</p>
-            <div class="order-details">
-              <h2>Order Details</h2>
-              <p><strong>Order ID:</strong> #${data.orderId}</p>
-              <p><strong>Total:</strong> ₵${data.orderTotal.toFixed(2)}</p>
-              ${data.trackingNumber ? `<p><strong>Tracking Number:</strong> ${data.trackingNumber}</p>` : ''}
-              ${data.estimatedDelivery ? `<p><strong>Estimated Delivery:</strong> ${data.estimatedDelivery}</p>` : ''}
-            </div>
-            <p>You can track your order at: <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/track-order">Track Order</a></p>
-          </div>
-          <div class="footer">
-            <p>Gloss Girlies - Your Beauty Destination</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `
-}
-
-// Helper function to generate admin email HTML (for future use)
-function generateAdminEmailHTML(data: OrderNotificationRequest): string {
-  return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #db2777; color: white; padding: 20px; text-align: center; }
-          .content { padding: 20px; background: #f9f9f9; }
-          .order-details { background: white; padding: 15px; margin: 15px 0; border-radius: 5px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>New Order Received</h1>
-          </div>
-          <div class="content">
-            <p>A new order has been placed:</p>
-            <div class="order-details">
-              <h2>Order #${data.orderId}</h2>
-              <p><strong>Customer:</strong> ${data.customerName}</p>
-              <p><strong>Email:</strong> ${data.customerEmail}</p>
-              <p><strong>Total:</strong> ₵${data.orderTotal.toFixed(2)}</p>
-              <p><strong>Payment Method:</strong> ${data.paymentMethod}</p>
-            </div>
-            <p><a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin/orders/${data.orderId}">View Order Details</a></p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `
-}
-

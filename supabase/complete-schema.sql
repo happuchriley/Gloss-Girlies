@@ -422,10 +422,10 @@ RETURNS INTEGER AS $$
 $$ LANGUAGE SQL SECURITY DEFINER;
 
 -- ============================================
--- 9. INITIAL DATA (Optional - for seeding)
+-- 9. INITIAL DATA (Optional)
 -- ============================================
--- Note: Products will be seeded automatically by the app on first run
--- You can add initial admin user here if needed
+-- Add products via the admin dashboard after setup.
+-- You can add an initial admin user here if needed.
 
 -- Example: Create admin user (run this separately after creating auth user)
 -- Replace 'USER_UUID_HERE' with actual UUID from auth.users

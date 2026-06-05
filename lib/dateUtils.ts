@@ -30,8 +30,6 @@ export function formatDate(date: Date | string | number): string {
  * Get current year - safe for SSR
  */
 export function getCurrentYear(): number {
-  // Use a static year to avoid hydration issues
-  // In production, you might want to use a build-time constant
-  return 2024
+  return new Date().getFullYear()
 }
 

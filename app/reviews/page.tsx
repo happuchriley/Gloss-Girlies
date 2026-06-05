@@ -1,25 +1,64 @@
-'use client'
+"use client"
 
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { FiStar, FiImage, FiVideo, FiSend } from 'react-icons/fi'
-import { useProductStore } from '@/store/productStore'
-import { useReviewStore } from '@/store/reviewStore'
-import { useAuthStore } from '@/store/authStore'
-import { formatDate } from '@/lib/dateUtils'
+import { useState, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { Star, ImageIcon, Send, MessageSquare } from "lucide-react"
+
+import { useProductStore } from "@/store/productStore"
+import { useReviewStore } from "@/store/reviewStore"
+import { useAuthStore } from "@/store/authStore"
+import { formatDate } from "@/lib/dateUtils"
+import { ShopPageHeader } from "@/components/shop/shop-page-header"
+import { PageTransition } from "@/components/layout/page-transition"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+
+function StarRating({
+  value,
+  onChange,
+  readOnly = false,
+}: {
+  value: number
+  onChange?: (n: number) => void
+  readOnly?: boolean
+}) {
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          disabled={readOnly}
+          onClick={() => onChange?.(star)}
+          className={readOnly ? "cursor-default" : "transition-transform hover:scale-110"}
+          aria-label={readOnly ? undefined : `Rate ${star} stars`}
+        >
+          <Star
+            className={`h-5 w-5 ${
+              star <= value
+                ? "fill-pink-500 text-pink-500"
+                : "text-pink-200"
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function ReviewsContent() {
   const searchParams = useSearchParams()
   const { products, initializeProducts } = useProductStore()
   const { reviews, addReview, getReviewsByProduct } = useReviewStore()
   const { user } = useAuthStore()
-  const [selectedProduct, setSelectedProduct] = useState(searchParams.get('product') || '')
+  const [selectedProduct, setSelectedProduct] = useState(searchParams.get("product") || "")
   const [rating, setRating] = useState(0)
-  const [comment, setComment] = useState('')
-  const [images, setImages] = useState<File[]>([])
-  const [videos, setVideos] = useState<File[]>([])
+  const [comment, setComment] = useState("")
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
-  const [videoPreviews, setVideoPreviews] = useState<string[]>([])
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     initializeProducts()
@@ -27,25 +66,10 @@ function ReviewsContent() {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    setImages([...images, ...files])
-    
     files.forEach((file) => {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setImagePreviews([...imagePreviews, reader.result as string])
-      }
-      reader.readAsDataURL(file)
-    })
-  }
-
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    setVideos([...videos, ...files])
-    
-    files.forEach((file) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setVideoPreviews([...videoPreviews, reader.result as string])
+        setImagePreviews((prev) => [...prev, reader.result as string])
       }
       reader.readAsDataURL(file)
     })
@@ -53,356 +77,188 @@ function ReviewsContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedProduct || rating === 0 || !comment.trim()) {
-      alert('Please fill in all required fields')
-      return
-    }
+    if (!selectedProduct || rating === 0 || !comment.trim()) return
+    if (!user) return
 
-    if (!user) {
-      alert('Please login to submit a review')
-      return
-    }
-
+    setSubmitting(true)
     const success = await addReview({
       productId: selectedProduct,
       userId: user.id,
       rating,
       comment,
       images: imagePreviews,
-      videos: videoPreviews,
+      videos: [],
     })
+    setSubmitting(false)
 
     if (success) {
-      setSelectedProduct('')
+      setSelectedProduct("")
       setRating(0)
-      setComment('')
-      setImages([])
-      setVideos([])
+      setComment("")
       setImagePreviews([])
-      setVideoPreviews([])
-      alert('Review submitted successfully!')
-    } else {
-      alert('Failed to submit review. You may have already reviewed this product.')
     }
   }
 
-  const removeImage = (index: number) => {
-    setImagePreviews(imagePreviews.filter((_, i) => i !== index))
-    setImages(images.filter((_, i) => i !== index))
-  }
-
-  const removeVideo = (index: number) => {
-    setVideoPreviews(videoPreviews.filter((_, i) => i !== index))
-    setVideos(videos.filter((_, i) => i !== index))
-  }
+  const displayReviews = selectedProduct
+    ? getReviewsByProduct(selectedProduct)
+    : reviews
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 md:py-8">
-      <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 md:mb-8">Product Reviews</h1>
+    <PageTransition className="container-app py-6 md:py-10">
+      <ShopPageHeader
+        eyebrow="Community"
+        title="Reviews & glow checks"
+        subtitle="Real experiences from Gloss Girlies shoppers — share yours after you try something."
+        align="center"
+      />
 
-      {/* Review Form */}
-      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6 sm:mb-8">
-        <h2 className="text-xl font-bold mb-4">Write a Review</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Product
-            </label>
-            <select
-              id="reviewProduct"
-              name="reviewProduct"
-              value={selectedProduct}
-              onChange={(e) => setSelectedProduct(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-              required
-            >
-              <option value="">Choose a product...</option>
-              {(products || []).map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rating
-            </label>
-            <div className="flex gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setRating(star)}
-                  className={`${
-                    star <= rating
-                      ? 'text-yellow-400'
-                      : 'text-gray-300'
-                  } hover:text-yellow-400 transition-colors`}
-                  aria-label={`Rate ${star} star${star !== 1 ? 's' : ''}`}
-                >
-                  <FiStar className="text-2xl fill-current" />
-                </button>
-              ))}
+      <Card className="mt-10 overflow-hidden rounded-2xl border-pink-100">
+        <CardHeader className="border-b border-pink-100 bg-pink-50/40">
+          <CardTitle className="font-display text-xl">Write a review</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          {!user ? (
+            <div className="rounded-2xl border border-pink-200 bg-pink-50/50 p-6 text-center">
+              <p className="text-sm text-neutral-600">Sign in to leave a review.</p>
+              <Button className="mt-4 rounded-full" asChild>
+                <Link href="/account?tab=login">Sign in</Link>
+              </Button>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Your Review
-            </label>
-            <textarea
-              id="reviewComment"
-              name="reviewComment"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-              placeholder="Share your experience with this product..."
-              required
-            />
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload Images
-              </label>
-              <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-pink-500 transition-colors">
-                <div className="text-center">
-                  <FiImage className="text-2xl text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Click to upload images</p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </label>
-              {imagePreviews.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {imagePreviews.map((preview, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={preview}
-                        alt={`Preview ${index + 1}`}
-                        className="w-full h-24 object-cover rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
-                        aria-label="Remove image"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload Videos
-              </label>
-              <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-pink-500 transition-colors">
-                <div className="text-center">
-                  <FiVideo className="text-2xl text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Click to upload videos</p>
-                </div>
-                <input
-                  type="file"
-                  accept="video/*"
-                  multiple
-                  onChange={handleVideoUpload}
-                  className="hidden"
-                />
-              </label>
-              {videoPreviews.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {(videoPreviews || []).map((preview, index) => (
-                    <div key={index} className="relative">
-                      <video
-                        src={preview}
-                        className="w-full h-24 object-cover rounded-lg"
-                        controls
-                        preload="metadata"
-                        playsInline
-                        disablePictureInPicture
-                        controlsList="nodownload"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeVideo(index)}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
-                        aria-label="Remove video"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-pink-600 text-white py-3 rounded-lg font-medium hover:bg-pink-700 transition-colors flex items-center justify-center gap-2"
-          >
-            <FiSend />
-            Submit Review
-          </button>
-        </form>
-      </div>
-
-      {/* Reviews List */}
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold mb-4">
-          {selectedProduct ? `Reviews for ${(products || []).find(p => p && p.id === selectedProduct)?.name || 'Product'}` : 'All Reviews'}
-        </h2>
-        {selectedProduct ? (
-          getReviewsByProduct(selectedProduct).length === 0 ? (
-            <p className="text-center text-gray-500 py-16">No reviews for this product yet.</p>
           ) : (
-            (getReviewsByProduct(selectedProduct) || []).map((review) => {
-              const product = (products || []).find((p) => p && p.id === review.productId)
-              return (
-                <div key={review.id} className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="font-bold text-lg">{product?.name || 'Product'}</h3>
-                      <p className="text-sm text-gray-500">{review.userName} • {formatDate(review.date)}</p>
-                    </div>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <FiStar
-                          key={star}
-                          className={`${
-                            star <= review.rating
-                              ? 'text-yellow-400 fill-current'
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-gray-700 mb-4">{review.comment}</p>
-                  
-                  {review.images && review.images.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2 mb-4">
-                      {(review.images || []).map((img, index) => (
-                        <img
-                          key={index}
-                          src={img}
-                          alt={`Review image ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {review.videos.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2">
-                      {review.videos.map((vid, index) => (
-                        <video
-                          key={index}
-                          src={vid}
-                          className="w-full h-32 object-cover rounded-lg"
-                          controls
-                          preload="metadata"
-                          playsInline
-                          disablePictureInPicture
-                          controlsList="nodownload"
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )
-        ) : reviews.length === 0 ? (
-          <p className="text-center text-gray-500 py-16">No reviews yet. Be the first to review!</p>
-        ) : (
-          (reviews || []).map((review) => {
-            const product = products.find((p) => p.id === review.productId)
-            return (
-              <div key={review.id} className="bg-white rounded-lg shadow-sm p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="font-bold text-lg">{product?.name || 'Product'}</h3>
-                    <p className="text-sm text-gray-500">{review.userName} • {review.date}</p>
-                  </div>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <FiStar
-                        key={star}
-                        className={`${
-                          star <= review.rating
-                            ? 'text-yellow-400 fill-current'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-gray-700 mb-4">{review.comment}</p>
-                
-                {review.images.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    {review.images.map((img, index) => (
-                      <img
-                        key={index}
-                        src={img}
-                        alt={`Review image ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg"
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {review.videos.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2">
-                    {review.videos.map((vid, index) => (
-                      <video
-                        key={index}
-                        src={vid}
-                        className="w-full h-32 object-cover rounded-lg"
-                        controls
-                        preload="metadata"
-                        playsInline
-                        disablePictureInPicture
-                        controlsList="nodownload"
-                      />
-                    ))}
-                  </div>
-                )}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="reviewProduct">Product</Label>
+                <select
+                  id="reviewProduct"
+                  value={selectedProduct}
+                  onChange={(e) => setSelectedProduct(e.target.value)}
+                  aria-label="Select product to review"
+                  className="flex h-10 w-full rounded-md border border-pink-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  required
+                >
+                  <option value="">Choose a product…</option>
+                  {(products || []).map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            )
-          })
+
+              <div className="space-y-2">
+                <Label>Rating</Label>
+                <StarRating value={rating} onChange={setRating} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reviewComment">Your review</Label>
+                <textarea
+                  id="reviewComment"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={4}
+                  placeholder="Share your experience…"
+                  className="flex w-full rounded-md border border-pink-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  required
+                />
+              </div>
+
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-pink-200 bg-pink-50/30 p-6 transition-colors hover:border-brand hover:bg-brand-light/50">
+                <ImageIcon className="h-6 w-6 text-brand" />
+                <span className="mt-2 text-xs font-medium text-neutral-600">Add photos</span>
+                <span className="mt-1 text-[10px] text-muted-foreground">JPEG, PNG, or WebP</span>
+                <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+              </label>
+
+              {imagePreviews.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {imagePreviews.map((src, i) => (
+                    <div key={`img-${i}`} className="relative aspect-square overflow-hidden rounded-md border border-pink-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setImagePreviews((p) => p.filter((_, j) => j !== i))}
+                        className="absolute right-1 top-1 rounded-full bg-ink px-1.5 text-xs text-white"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full rounded-md bg-brand hover:bg-brand-dark"
+                disabled={submitting}
+              >
+                <Send className="h-4 w-4" />
+                {submitting ? "Submitting…" : "Submit review"}
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+
+      <section className="mt-12">
+        <h2 className="flex items-center gap-2 font-display text-2xl text-ink">
+          <MessageSquare className="h-5 w-5 text-pink-500" />
+          {selectedProduct
+            ? `Reviews for ${products.find((p) => p.id === selectedProduct)?.name ?? "product"}`
+            : "All reviews"}
+        </h2>
+
+        {displayReviews.length === 0 ? (
+          <div className="mt-6 rounded-3xl border border-dashed border-pink-200 bg-pink-50/40 py-16 text-center">
+            <p className="text-neutral-600">No reviews yet. Be the first to share your glow!</p>
+          </div>
+        ) : (
+          <div className="mt-6 space-y-4">
+            {displayReviews.map((review) => {
+              const product = products.find((p) => p.id === review.productId)
+              return (
+                <Card key={review.id} className="rounded-2xl border-pink-100">
+                  <CardContent className="p-5 sm:p-6">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold text-ink">{product?.name ?? "Product"}</h3>
+                        <p className="mt-1 text-xs text-neutral-500">
+                          {review.userName} · {formatDate(review.date)}
+                        </p>
+                      </div>
+                      <StarRating value={review.rating} readOnly />
+                    </div>
+                    <p className="mt-4 text-sm leading-relaxed text-neutral-700">{review.comment}</p>
+                    {review.images?.length > 0 && (
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        {review.images.map((img, i) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={i} src={img} alt="" className="aspect-square rounded-xl object-cover" />
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
         )}
-      </div>
-    </div>
+      </section>
+    </PageTransition>
   )
 }
 
 export default function ReviewsPage() {
   return (
-    <Suspense fallback={
-      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 md:py-8">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 md:mb-8">Product Reviews</h1>
-        <div className="text-center py-16">
-          <p className="text-gray-500">Loading...</p>
+    <Suspense
+      fallback={
+        <div className="container-app py-12">
+          <div className="h-32 animate-pulse rounded-3xl bg-pink-50" />
         </div>
-      </div>
-    }>
+      }
+    >
       <ReviewsContent />
     </Suspense>
   )
 }
-

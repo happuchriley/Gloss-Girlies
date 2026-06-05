@@ -1,59 +1,91 @@
-'use client'
+"use client"
 
-import BackButton from '@/components/BackButton'
+import { ShopPageHeader } from "@/components/shop/shop-page-header"
+import { PageTransition } from "@/components/layout/page-transition"
+import { Card, CardContent } from "@/components/ui/card"
+import Link from "next/link"
+
+const FAQS = [
+  {
+    question: "How do I place an order?",
+    answer:
+      "Browse products, add items to your bag, and proceed to checkout. You can shop as a guest or sign in to save your order history.",
+  },
+  {
+    question: "What payment methods do you accept?",
+    answer:
+      "We accept Paystack (card & mobile money) and cash on delivery in eligible areas.",
+  },
+  {
+    question: "How long does shipping take?",
+    answer:
+      "Standard shipping takes 5–7 business days. Express options are available at checkout.",
+  },
+  {
+    question: "Can I return or exchange products?",
+    answer:
+      "Yes — unused products in original packaging can be returned within 7 days. See our Returns policy for details.",
+  },
+  {
+    question: "How do I track my order?",
+    answer:
+      "Use the Track Order page with your order ID and email, or check your account order history after signing in.",
+  },
+  {
+    question: "Are the products authentic?",
+    answer:
+      "Yes. We source from authorized distributors and trusted beauty brands.",
+  },
+  {
+    question: "Do you ship outside Ghana?",
+    answer:
+      "We currently ship within Ghana. International shipping may be added in the future.",
+  },
+  {
+    question: "How can I contact customer support?",
+    answer:
+      "Email support@glossgirlies.com or use the Contact page. We respond Monday–Saturday, 9 AM–6 PM GMT.",
+  },
+] as const
 
 export default function FAQPage() {
-  const faqs = [
-    {
-      question: 'How do I place an order?',
-      answer: 'Simply browse our products, add items to your cart, and proceed to checkout. You\'ll need to create an account or login to complete your purchase.'
-    },
-    {
-      question: 'What payment methods do you accept?',
-      answer: 'We accept credit/debit cards and cash on delivery (COD) for your convenience.'
-    },
-    {
-      question: 'How long does shipping take?',
-      answer: 'Standard shipping typically takes 5-7 business days. Express shipping options are available at checkout.'
-    },
-    {
-      question: 'Can I return or exchange products?',
-      answer: 'Yes, you can return unused products within 7 days of delivery. Please check our Return Policy for detailed information.'
-    },
-    {
-      question: 'How do I track my order?',
-      answer: 'Once your order is shipped, you\'ll receive a tracking number via email. You can also track your order using our Track Order page.'
-    },
-    {
-      question: 'Are the products authentic?',
-      answer: 'Yes, we guarantee 100% authentic products from authorized distributors and brands.'
-    },
-    {
-      question: 'Do you offer international shipping?',
-      answer: 'Currently, we only ship within India. International shipping may be available in the future.'
-    },
-    {
-      question: 'How can I contact customer support?',
-      answer: 'You can reach us via email at support@glossgirlies.com or call us at 1800-123-4567. Our support team is available Monday to Saturday, 9 AM to 6 PM.'
-    }
-  ]
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-4">
-        <BackButton />
+    <PageTransition className="container-app py-6 md:py-10">
+      <div className="mx-auto max-w-3xl">
+        <Link
+          href="/help"
+          className="mb-4 inline-block text-sm text-pink-600 hover:text-pink-700"
+        >
+          ← Back to help center
+        </Link>
+
+        <ShopPageHeader
+          eyebrow="Support"
+          title="FAQ"
+          subtitle="Everything you need to know before and after your purchase."
+        />
+
+        <Card className="mt-8 overflow-hidden rounded-2xl border-pink-100">
+          <CardContent className="divide-y divide-pink-50 p-0">
+            {FAQS.map((faq) => (
+              <details
+                key={faq.question}
+                className="group px-5 py-4 transition-colors open:bg-pink-50/30 sm:px-6"
+              >
+                <summary className="cursor-pointer list-none font-medium text-ink marker:hidden">
+                  <span className="flex items-center justify-between gap-3">
+                    {faq.question}
+                    <span className="text-pink-400 transition-transform group-open:rotate-45">
+                      +
+                    </span>
+                  </span>
+                </summary>
+                <p className="mt-3 text-sm leading-relaxed text-neutral-600">{faq.answer}</p>
+              </details>
+            ))}
+          </CardContent>
+        </Card>
       </div>
-      <h1 className="text-3xl font-bold mb-8">Frequently Asked Questions</h1>
-      
-      <div className="max-w-3xl mx-auto space-y-4">
-        {faqs.map((faq, index) => (
-          <div key={index} className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-bold mb-2">{faq.question}</h2>
-            <p className="text-gray-700">{faq.answer}</p>
-          </div>
-        ))}
-      </div>
-    </div>
+    </PageTransition>
   )
 }
-

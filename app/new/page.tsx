@@ -1,13 +1,28 @@
-'use client'
+"use client"
 
-import ProductGrid from '@/components/ProductGrid'
+import { useProductCatalog } from "@/hooks/use-product-catalog"
+import { ProductGrid } from "@/components/products/product-grid"
+import { ShopPageHeader } from "@/components/shop/shop-page-header"
+import { PageTransition } from "@/components/layout/page-transition"
 
-export default function NewPage() {
+export default function NewArrivalsPage() {
+  const { products, loading } = useProductCatalog({ sort: "newest" })
+
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 md:py-8">
-      <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 md:mb-8">New Arrivals</h1>
-      <ProductGrid />
-    </div>
+    <PageTransition className="container-app py-6 md:py-10">
+      <ShopPageHeader
+        eyebrow="Just dropped"
+        title="New arrivals"
+        subtitle="Fresh picks from the Gloss Girlies edit — tap Add to bag on any card."
+        align="center"
+      />
+      <div className="mt-10">
+        <ProductGrid
+          products={products}
+          loading={loading}
+          emptyMessage="No new arrivals yet — check back soon."
+        />
+      </div>
+    </PageTransition>
   )
 }
-

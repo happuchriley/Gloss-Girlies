@@ -1,163 +1,155 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { FiMail, FiPhone, FiMapPin } from 'react-icons/fi'
-import BackButton from '@/components/BackButton'
+import { useState } from "react"
+import Link from "next/link"
+import { Mail, MapPin, Phone } from "lucide-react"
+
+import { ShopPageHeader } from "@/components/shop/shop-page-header"
+import { PageTransition } from "@/components/layout/page-transition"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { siteConfig } from "@/config/site"
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    subject: '',
-    message: ''
+    name: "",
+    email: "",
+    phone: "",
+    subject: "",
+    message: "",
   })
   const [submitted, setSubmitted] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would send to a backend
     setSubmitted(true)
     setTimeout(() => setSubmitted(false), 3000)
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-4">
-        <BackButton />
-      </div>
-      <h1 className="text-3xl font-bold mb-8">Contact Us</h1>
-      
-      <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
-        <div>
-          <h2 className="text-xl font-bold mb-6">Get in Touch</h2>
-          
-          <div className="space-y-6 mb-8">
-            <div className="flex items-start gap-4">
-              <FiMail className="text-2xl text-pink-600 mt-1" />
-              <div>
-                <h3 className="font-bold mb-1">Email</h3>
-                <p className="text-gray-600">support@glossgirlies.com</p>
+    <PageTransition className="container-app py-6 md:py-10">
+      <div className="mx-auto max-w-5xl">
+        <Link
+          href="/help"
+          className="mb-4 inline-block text-sm text-pink-600 hover:text-pink-700"
+        >
+          ← Back to help center
+        </Link>
+
+        <ShopPageHeader
+          eyebrow="Support"
+          title="Contact us"
+          subtitle="Reach our team for order updates, product help, and account questions."
+        />
+
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <Card className="rounded-2xl border-pink-100">
+            <CardHeader className="border-b border-pink-100 bg-pink-50/30">
+              <CardTitle className="font-display text-xl">Get in touch</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-6">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-pink-100 p-2">
+                  <Mail className="h-4 w-4 text-pink-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-ink">Email</p>
+                  <p className="text-sm text-neutral-500">{siteConfig.supportEmail}</p>
+                </div>
               </div>
-            </div>
-            
-            <div className="flex items-start gap-4">
-              <FiPhone className="text-2xl text-pink-600 mt-1" />
-              <div>
-                <h3 className="font-bold mb-1">Phone</h3>
-                <p className="text-gray-600">1800-123-4567</p>
-                <p className="text-sm text-gray-500">Mon-Sat, 9 AM - 6 PM</p>
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-pink-100 p-2">
+                  <Phone className="h-4 w-4 text-pink-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-ink">Phone</p>
+                  <p className="text-sm text-neutral-500">{siteConfig.supportPhone}</p>
+                  <p className="text-xs text-neutral-400">Mon–Sat, 9 AM – 6 PM</p>
+                </div>
               </div>
-            </div>
-            
-            <div className="flex items-start gap-4">
-              <FiMapPin className="text-2xl text-pink-600 mt-1" />
-              <div>
-                <h3 className="font-bold mb-1">Address</h3>
-                <p className="text-gray-600">
-                  123 Beauty Street<br />
-                  Mumbai, Maharashtra 400001<br />
-                  India
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-pink-100 p-2">
+                  <MapPin className="h-4 w-4 text-pink-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-ink">Address</p>
+                  <p className="text-sm text-neutral-500">
+                    123 Beauty Street
+                    <br />
+                    Accra, Ghana
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-pink-100">
+            <CardHeader className="border-b border-pink-100 bg-pink-50/30">
+              <CardTitle className="font-display text-xl">Send a message</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {submitted ? (
+                <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  Thanks! Your message was received. We&apos;ll respond soon.
                 </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold mb-6">Send us a Message</h2>
-          
-          {submitted ? (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
-              Thank you! Your message has been sent. We'll get back to you soon.
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Name *
-                </label>
-                <input
-                  type="text"
-                  id="contactName"
-                  name="contactName"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  id="contactEmail"
-                  name="contactEmail"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone
-                </label>
-                <input
-                  type="tel"
-                  id="contactPhone"
-                  name="contactPhone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Subject *
-                </label>
-                <input
-                  type="text"
-                  id="contactSubject"
-                  name="contactSubject"
-                  value={formData.subject}
-                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Message *
-                </label>
-                <textarea
-                  id="contactMessage"
-                  name="contactMessage"
-                  value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-pink-600 text-white py-3 rounded-lg font-medium hover:bg-pink-700 transition-colors"
-              >
-                Send Message
-              </button>
-            </form>
-          )}
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contactName">Name</Label>
+                    <Input
+                      id="contactName"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="rounded-xl border-pink-200"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactEmail">Email</Label>
+                    <Input
+                      id="contactEmail"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="rounded-xl border-pink-200"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactSubject">Subject</Label>
+                    <Input
+                      id="contactSubject"
+                      value={formData.subject}
+                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                      className="rounded-xl border-pink-200"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactMessage">Message</Label>
+                    <textarea
+                      id="contactMessage"
+                      value={formData.message}
+                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      rows={4}
+                      className="w-full rounded-xl border border-pink-200 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                      required
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full rounded-full bg-pink-600 hover:bg-pink-500"
+                  >
+                    Send message
+                  </Button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </div>
+    </PageTransition>
   )
 }
-

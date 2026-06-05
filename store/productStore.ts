@@ -1,11 +1,21 @@
 import { create } from "zustand";
-import { Product } from "@/data/products";
-import { products as initialProducts } from "@/data/products";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  category: string;
+  description: string;
+  brand: string;
+}
 
 export interface ProductWithInventory extends Product {
   stock: number;
   sku?: string;
+  featured?: boolean;
+  images?: string[];
 }
 
 interface ProductStore {
@@ -22,6 +32,22 @@ interface ProductStore {
   getProductById: (id: string) => ProductWithInventory | undefined;
 }
 
+function mapRow(p: Record<string, unknown>): ProductWithInventory {
+  return {
+    id: String(p.id ?? ""),
+    name: String(p.name ?? "Unknown Product"),
+    brand: String(p.brand ?? "Unknown Brand"),
+    price: Number(p.price) || 0,
+    image: String(p.image ?? ""),
+    category: String(p.category ?? "uncategorized"),
+    description: String(p.description ?? ""),
+    stock: Number(p.stock) || 0,
+    sku: p.sku ? String(p.sku) : undefined,
+    featured: Boolean(p.featured),
+    images: Array.isArray(p.images) ? (p.images as string[]) : [],
+  };
+}
+
 export const useProductStore = create<ProductStore>()((set, get) => ({
   products: [],
   loading: false,
@@ -31,14 +57,13 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
       console.error(
         "Supabase is not configured. Please set environment variables."
       );
-      set({ loading: false });
+      set({ products: [], loading: false });
       return;
     }
 
     try {
       set({ loading: true });
 
-      // Fetch products from Supabase
       const { data, error } = await supabase
         .from("products")
         .select("*")
@@ -46,125 +71,18 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
 
       if (error) {
         console.error("Error fetching products:", error);
-        set({ loading: false });
+        set({ products: [], loading: false });
         return;
       }
 
-      if (data && data.length > 0) {
-        // Convert database format to ProductWithInventory
-        const products: ProductWithInventory[] = data
-          .filter((p) => p && p.id) // Filter out invalid products
-          .map((p) => ({
-            id: p.id || "",
-            name: p.name || "Unknown Product",
-            brand: p.brand || "Unknown Brand",
-            price: Number(p.price) || 0,
-            image: p.image || "",
-            category: p.category || "uncategorized",
-            description: p.description || "",
-            stock: Number(p.stock) || 0,
-            sku: p.sku || undefined,
-          }));
-        set({ products, loading: false });
-      } else {
-        // Database is empty, try to seed using secure function
-        // First, check if user is admin before attempting to seed
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        let isAdmin = false;
+      const products = (data ?? [])
+        .filter((p) => p && p.id)
+        .map((p) => mapRow(p as Record<string, unknown>));
 
-        if (session?.user) {
-          const { data: profile } = await supabase
-            .from("users")
-            .select("role")
-            .eq("id", session.user.id)
-            .single();
-
-          isAdmin = profile?.role === "admin";
-        }
-
-        // Only attempt seeding if user is admin
-        if (isAdmin) {
-          const { error: seedError } = await supabase.rpc("seed_products");
-
-          if (seedError) {
-            // Only log unexpected errors, not permission errors
-            if (
-              !seedError.message?.includes("admin") &&
-              !seedError.message?.includes("permission")
-            ) {
-              console.error(
-                "Unexpected error seeding products:",
-                seedError.message
-              );
-            }
-
-            // Fall back to local products
-            const productsWithStock: ProductWithInventory[] =
-              initialProducts.map((p) => ({
-                ...p,
-                stock: 100,
-                sku: `SKU-${p.id.padStart(6, "0")}`,
-              }));
-            set({ products: productsWithStock, loading: false });
-            return;
-          }
-        } else {
-          // User is not admin - silently use local products
-          const productsWithStock: ProductWithInventory[] = initialProducts.map(
-            (p) => ({
-              ...p,
-              stock: 100,
-              sku: `SKU-${p.id.padStart(6, "0")}`,
-            })
-          );
-          set({ products: productsWithStock, loading: false });
-          return;
-        }
-
-        // If seeding succeeded, fetch the products
-        const { data: seededData, error: fetchError } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (fetchError) {
-          console.error("Error fetching seeded products:", fetchError);
-          set({ loading: false });
-          return;
-        }
-
-        if (seededData && seededData.length > 0) {
-          const products: ProductWithInventory[] = seededData
-            .filter((p) => p && p.id)
-            .map((p) => ({
-              id: p.id || "",
-              name: p.name || "Unknown Product",
-              brand: p.brand || "Unknown Brand",
-              price: Number(p.price) || 0,
-              image: p.image || "",
-              category: p.category || "uncategorized",
-              description: p.description || "",
-              stock: Number(p.stock) || 0,
-              sku: p.sku || undefined,
-            }));
-          set({ products, loading: false });
-        } else {
-          // Fallback: use local products if seeding didn't work
-          const productsWithStock: ProductWithInventory[] = initialProducts.map(
-            (p) => ({
-              ...p,
-              stock: 100,
-              sku: `SKU-${p.id.padStart(6, "0")}`,
-            })
-          );
-          set({ products: productsWithStock, loading: false });
-        }
-      }
+      set({ products, loading: false });
     } catch (error) {
       console.error("Error initializing products:", error);
-      set({ loading: false });
+      set({ products: [], loading: false });
     }
   },
 
@@ -176,7 +94,6 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
       sku: product.sku || `SKU-${Date.now()}`,
     };
 
-    // If Supabase is configured, save to database
     if (isSupabaseConfigured()) {
       try {
         const { error } = await supabase.from("products").insert({
@@ -201,7 +118,6 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
       }
     }
 
-    // Update local state
     const products = get().products || [];
     set({ products: [...products, newProduct] });
     return true;
@@ -214,7 +130,7 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
     }
 
     try {
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
       if (updates.name) updateData.name = updates.name;
       if (updates.brand) updateData.brand = updates.brand;
       if (updates.price !== undefined) updateData.price = updates.price;
@@ -234,7 +150,6 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
         return false;
       }
 
-      // Update local state
       const products = get().products || [];
       set({
         products: products.map((p) =>
@@ -262,7 +177,6 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
         return false;
       }
 
-      // Update local state
       const products = get().products || [];
       set({ products: products.filter((p) => p && p.id !== id) });
       return true;
@@ -289,7 +203,6 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
         return false;
       }
 
-      // Update local state
       const products = get().products || [];
       set({
         products: products.map((p) =>

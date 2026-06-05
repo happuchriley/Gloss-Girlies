@@ -4,6 +4,8 @@ export interface OrderNotificationData {
   orderId: string
   customerName: string
   customerEmail: string
+  /** Shipping / guest phone for SMS (Ghana format preferred). */
+  customerPhone?: string
   orderTotal: number
   orderItems: Array<{
     name: string
@@ -20,6 +22,7 @@ export interface OrderNotificationData {
     phone: string
   }
   paymentMethod: string
+  fulfillmentType?: "delivery" | "pickup"
   trackingNumber?: string
   estimatedDelivery?: string
 }

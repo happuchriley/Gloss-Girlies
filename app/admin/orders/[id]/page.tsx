@@ -1,203 +1,200 @@
-'use client'
+"use client"
 
-import { useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/authStore'
-import { useOrderStore } from '@/store/orderStore'
-import Link from 'next/link'
-import { FiPackage, FiTruck, FiCheckCircle, FiMapPin, FiCreditCard } from 'react-icons/fi'
-import { useState } from 'react'
-import { formatDate } from '@/lib/dateUtils'
-import BackButton from '@/components/BackButton'
+import Link from "next/link"
+import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
+
+import { AdminHeader } from "@/components/admin/admin-header"
+import { adminUi } from "@/components/admin/admin-ui"
+import { OrderStatusBadge } from "@/components/admin/order-status-badge"
+import { FulfillmentBadge } from "@/components/orders/fulfillment-badge"
+import { getAdminStatusLabel } from "@/lib/orders/fulfillment"
+import { getPaymentMethodLabel } from "@/lib/orders/payment"
+import { PageTransition } from "@/components/layout/page-transition"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatDate } from "@/lib/dateUtils"
+import { formatPrice } from "@/lib/products/format"
+import { useOrderStore } from "@/store/orderStore"
+
+const selectClass = adminUi.select
 
 export default function AdminOrderDetailPage() {
   const params = useParams()
-  const router = useRouter()
-  const { isAuthenticated, isAdmin } = useAuthStore()
   const { getOrderById, updateOrderStatus, initializeOrders } = useOrderStore()
-  const [newStatus, setNewStatus] = useState('')
+  const [newStatus, setNewStatus] = useState("")
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (!isAuthenticated || !isAdmin) {
-      router.push('/account')
-      return
-    }
     initializeOrders()
-  }, [isAuthenticated, isAdmin, router, initializeOrders])
-
-  if (!isAuthenticated || !isAdmin) {
-    return null
-  }
+  }, [initializeOrders])
 
   const order = getOrderById(params.id as string)
 
   if (!order) {
     return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold mb-4">Order not found</h1>
-        <Link href="/admin/orders" className="text-pink-600 hover:underline">
-          Back to Orders
+      <PageTransition className="container-app py-16 text-center">
+        <h1 className="font-display text-2xl text-ink">Order not found</h1>
+        <Link href="/admin/orders" className={`mt-4 inline-block ${adminUi.accentLink}`}>
+          Back to orders
         </Link>
-      </div>
+      </PageTransition>
     )
   }
 
-  const handleStatusUpdate = () => {
-    if (newStatus && confirm(`Update order status to ${newStatus}?`)) {
-      updateOrderStatus(order.id, newStatus as any)
-      setNewStatus('')
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'bg-green-100 text-green-800'
-      case 'shipped':
-        return 'bg-blue-100 text-blue-800'
-      case 'confirmed':
-        return 'bg-pink-100 text-pink-800'
-      case 'cancelled':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
+  const handleStatusUpdate = async () => {
+    if (!newStatus || newStatus === order.status) return
+    if (!confirm(`Update order status to ${newStatus}?`)) return
+    setSaving(true)
+    try {
+      await updateOrderStatus(order.id, newStatus as Parameters<typeof updateOrderStatus>[1])
+      setNewStatus("")
+    } finally {
+      setSaving(false)
     }
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <div className="mb-4">
-          <BackButton label="Back to Orders" />
-        </div>
-        <h1 className="text-3xl font-bold">Order Details</h1>
-      </div>
+    <PageTransition className="container-app py-6 md:py-10">
+      <AdminHeader
+        title={`Order ${order.id}`}
+        subtitle={`Placed ${formatDate(order.createdAt)}`}
+        backHref="/admin/orders"
+        backLabel="Back to orders"
+      />
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          {/* Order Status */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold">Order #{order.id}</h2>
-                <p className="text-sm text-gray-500">
-                  Placed on {formatDate(order.createdAt)}
-                </p>
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="space-y-6 md:col-span-2">
+          <Card className={adminUi.card}>
+            <CardHeader className={adminUi.cardHeader}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className={adminUi.cardTitle}>Order status</CardTitle>
+                  <CardDescription>Update fulfillment progress.</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <OrderStatusBadge status={order.status} />
+                  <FulfillmentBadge type={order.fulfillmentType ?? "delivery"} />
+                </div>
               </div>
-              <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
-                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-              </span>
-            </div>
-
-            <div className="mt-4 pt-4 border-t">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Update Status
-              </label>
-              <div className="flex gap-2">
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <select
                   value={newStatus || order.status}
                   onChange={(e) => setNewStatus(e.target.value)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  className={selectClass}
+                  aria-label="Order status"
                 >
                   <option value="pending">Pending</option>
                   <option value="confirmed">Confirmed</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
+                  <option value="shipped">
+                    {getAdminStatusLabel("shipped", order.fulfillmentType)}
+                  </option>
+                  <option value="delivered">
+                    {getAdminStatusLabel("delivered", order.fulfillmentType)}
+                  </option>
                   <option value="cancelled">Cancelled</option>
                 </select>
                 {newStatus && newStatus !== order.status && (
-                  <button
+                  <Button
                     onClick={handleStatusUpdate}
-                    className="bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition-colors"
+                    disabled={saving}
+                    className={`sm:shrink-0 ${adminUi.primaryBtn}`}
                   >
-                    Update
-                  </button>
+                    {saving ? "Saving…" : "Update status"}
+                  </Button>
                 )}
               </div>
-            </div>
+              {order.trackingNumber && (
+                <div className="mt-4 rounded-xl border border-pink-100 bg-pink-50/30 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wider text-neutral-500">Tracking number</p>
+                  <p className="mt-1 font-mono font-semibold text-ink">{order.trackingNumber}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            {order.trackingNumber && (
-              <div className="mt-4 pt-4 border-t">
-                <p className="text-sm text-gray-500">Tracking Number</p>
-                <p className="font-mono font-bold">{order.trackingNumber}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Order Items */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold mb-4">Order Items</h2>
-            <div className="space-y-4">
+          <Card className={adminUi.card}>
+            <CardHeader className={adminUi.cardHeader}>
+              <CardTitle className={adminUi.cardTitle}>Items</CardTitle>
+              <CardDescription>{order.items.length} item{order.items.length === 1 ? "" : "s"}</CardDescription>
+            </CardHeader>
+            <CardContent className="divide-y divide-pink-50 p-0">
               {(order.items || []).map((item) => (
-                <div key={item.id} className="flex items-center gap-4 pb-4 border-b last:border-0">
+                <div key={item.id} className="flex items-center gap-4 px-6 py-4">
                   <img
                     src={item.image}
                     alt={item.name}
-                    className="w-20 h-20 object-cover rounded-lg"
+                    className="h-16 w-16 rounded-xl border border-pink-100 object-cover"
                   />
-                  <div className="flex-1">
-                    <h3 className="font-medium">{item.name}</h3>
-                    <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-medium text-ink">{item.name}</h3>
+                    <p className="text-sm text-neutral-500">Qty {item.quantity}</p>
                   </div>
-                  <p className="text-lg font-bold">₵{item.price * item.quantity}</p>
+                  <p className="font-semibold text-ink">
+                    {formatPrice(item.price * item.quantity)}
+                  </p>
                 </div>
               ))}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* Shipping Address */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <FiMapPin className="text-xl text-pink-600" />
-              <h2 className="text-xl font-bold">Shipping Address</h2>
-            </div>
-            <div className="text-gray-700">
-              <p className="font-medium">{order.shippingAddress.fullName}</p>
+          <Card className={adminUi.card}>
+            <CardHeader className={adminUi.cardHeader}>
+              <CardTitle className={adminUi.cardTitle}>
+                {order.fulfillmentType === "pickup" ? "Pickup details" : "Shipping address"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 text-neutral-700">
+              <p className="font-medium text-ink">{order.shippingAddress.fullName}</p>
               <p>{order.shippingAddress.addressLine1}</p>
               {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
               <p>
-                {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pincode}
+                {order.shippingAddress.city}, {order.shippingAddress.state}{" "}
+                {order.shippingAddress.pincode}
               </p>
               <p>{order.shippingAddress.country}</p>
-              <p className="mt-2">Phone: {order.shippingAddress.phone}</p>
-            </div>
-          </div>
+              <p className="mt-2 text-sm">
+                <span className="text-neutral-500">Phone:</span> {order.shippingAddress.phone}
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Order Summary */}
-        <div className="md:col-span-1">
-          <div className="bg-white rounded-lg shadow-sm p-6 sticky top-20">
-            <h2 className="text-xl font-bold mb-4">Order Summary</h2>
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-gray-600">
+        <div>
+          <Card className={`sticky top-20 ${adminUi.card}`}>
+            <CardHeader className={adminUi.cardHeader}>
+              <CardTitle className={adminUi.cardTitle}>Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-6">
+              <div className="flex justify-between text-sm text-neutral-600">
                 <span>Subtotal</span>
-                <span>₵{order.total}</span>
+                <span>{formatPrice(order.total)}</span>
               </div>
-              <div className="flex justify-between text-gray-600">
+              <div className="flex justify-between text-sm text-neutral-600">
                 <span>Shipping</span>
                 <span>Free</span>
               </div>
-              <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between text-lg font-bold">
+              <div className="border-t border-pink-100 pt-3">
+                <div className="flex justify-between text-lg font-semibold text-ink">
                   <span>Total</span>
-                  <span>₵{order.total}</span>
+                  <span>{formatPrice(order.total)}</span>
                 </div>
               </div>
-            </div>
-
-            <div className="pt-4 border-t">
-              <div className="flex items-center gap-3 mb-2">
-                <FiCreditCard className="text-gray-500" />
-                <span className="text-sm text-gray-500">Payment Method</span>
+              <div className="border-t border-pink-100 pt-3">
+                <p className="text-xs uppercase tracking-wider text-neutral-500">Payment</p>
+                <p className="mt-1 font-medium text-ink">
+                  {getPaymentMethodLabel(
+                    order.paymentMethod,
+                    order.fulfillmentType ?? "delivery"
+                  )}
+                </p>
               </div>
-              <p className="font-medium">
-                {order.paymentMethod === 'card' ? 'Credit/Debit Card' : 'Cash on Delivery'}
-              </p>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </div>
+    </PageTransition>
   )
 }
-

@@ -1,14 +1,21 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
+
+import BackButton from '@/components/BackButton'
+import { OrderStatusBadge } from '@/components/admin/order-status-badge'
+import { FulfillmentBadge } from '@/components/orders/fulfillment-badge'
+import { OrderTrackingPanel } from '@/components/orders/order-tracking-panel'
+import { PageTransition } from '@/components/layout/page-transition'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatDate } from '@/lib/dateUtils'
+import { getPaymentMethodLabel } from '@/lib/orders/payment'
+import { formatPrice } from '@/lib/products/format'
 import { useAuthStore } from '@/store/authStore'
 import { useOrderStore } from '@/store/orderStore'
-import Link from 'next/link'
-import { FiPackage, FiTruck, FiCheckCircle, FiMapPin, FiCreditCard, FiX } from 'react-icons/fi'
-import { useState } from 'react'
-import { formatDate } from '@/lib/dateUtils'
-import BackButton from '@/components/BackButton'
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -25,201 +32,174 @@ export default function OrderDetailPage() {
     initializeOrders()
   }, [isAuthenticated, user, router, initializeOrders])
 
-  if (!isAuthenticated || !user) {
-    return null
-  }
+  if (!isAuthenticated || !user) return null
 
   const order = getOrderById(params.id as string)
 
   if (!order) {
     return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold mb-4">Order not found</h1>
-        <Link
-          href="/orders"
-          className="text-pink-600 hover:underline"
-        >
-          Back to Orders
+      <div className="container-app py-16 text-center">
+        <h1 className="text-2xl font-bold">Order not found</h1>
+        <Link href="/orders" className="mt-2 inline-block text-primary hover:underline">
+          Back to orders
         </Link>
       </div>
     )
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return <FiCheckCircle className="text-green-500 text-2xl" />
-      case 'shipped':
-        return <FiTruck className="text-blue-500 text-2xl" />
-      case 'confirmed':
-        return <FiPackage className="text-pink-500 text-2xl" />
-      default:
-        return <FiPackage className="text-gray-500 text-2xl" />
-    }
-  }
-
-  const handleCancelOrder = async () => {
-    if (!user) return
-    
-    if (confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
-      setIsCancelling(true)
-      try {
-        const success = await cancelOrder(order.id, user.id)
-        if (success) {
-          alert('Order cancelled successfully')
-        } else {
-          alert('Cannot cancel this order. It may have already been shipped or delivered.')
-        }
-      } catch (error) {
-        alert('An error occurred while cancelling the order. Please try again.')
-      } finally {
-        setIsCancelling(false)
-      }
-    }
-  }
-
   const canCancel = order.status === 'pending' || order.status === 'confirmed'
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'bg-green-100 text-green-800'
-      case 'shipped':
-        return 'bg-blue-100 text-blue-800'
-      case 'confirmed':
-        return 'bg-pink-100 text-pink-800'
-      case 'cancelled':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
+  const handleCancelOrder = async () => {
+    if (
+      !confirm('Are you sure you want to cancel this order? This action cannot be undone.')
+    )
+      return
+    setIsCancelling(true)
+    try {
+      const success = await cancelOrder(order.id, user.id)
+      if (!success) {
+        alert('Cannot cancel this order. It may already be shipped or delivered.')
+      }
+    } finally {
+      setIsCancelling(false)
     }
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <PageTransition className="container-app py-6 md:py-10">
       <div className="mb-6">
         <div className="mb-4">
           <BackButton label="Back to Orders" />
         </div>
-        <h1 className="text-3xl font-bold">Order Details</h1>
+        <h1 className="heading-display text-3xl font-semibold">Order details</h1>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          {/* Order Status */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center gap-4 mb-4">
-              {getStatusIcon(order.status)}
-              <div>
-                <h2 className="text-xl font-bold">Order #{order.id}</h2>
-                <p className="text-sm text-gray-500">
-                  Placed on {formatDate(order.createdAt)}
-                </p>
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="space-y-6 md:col-span-2">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold">Order #{order.id}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Placed on {formatDate(order.createdAt)}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <OrderStatusBadge status={order.status} />
+                  <FulfillmentBadge type={order.fulfillmentType ?? "delivery"} />
+                </div>
               </div>
-            </div>
-            <div className={`inline-block px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
-              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-            </div>
-            
-            {canCancel && (
-              <button
-                onClick={handleCancelOrder}
-                disabled={isCancelling}
-                className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                <FiX />
-                {isCancelling ? 'Cancelling...' : 'Cancel Order'}
-              </button>
-            )}
-            
-            {order.trackingNumber && (
-              <div className="mt-4 pt-4 border-t">
-                <p className="text-sm text-gray-500">Tracking Number</p>
-                <p className="font-mono font-bold">{order.trackingNumber}</p>
-              </div>
-            )}
-            {order.estimatedDelivery && (
-              <div className="mt-2">
-                <p className="text-sm text-gray-500">Estimated Delivery</p>
-                <p className="font-medium">{formatDate(order.estimatedDelivery)}</p>
-              </div>
-            )}
-          </div>
 
-          {/* Order Items */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold mb-4">Order Items</h2>
-            <div className="space-y-4">
-              {(order.items || []).map((item) => (
-                <div key={item.id} className="flex items-center gap-4 pb-4 border-b last:border-0">
+              {canCancel && (
+                <Button
+                  variant="destructive"
+                  onClick={handleCancelOrder}
+                  disabled={isCancelling}
+                  className="mt-4"
+                >
+                  {isCancelling ? 'Cancelling…' : 'Cancel order'}
+                </Button>
+              )}
+
+            </CardContent>
+          </Card>
+
+          <OrderTrackingPanel
+            order={{
+              id: order.id,
+              status: order.status,
+              fulfillmentType: order.fulfillmentType,
+              total: order.total,
+              trackingNumber: order.trackingNumber,
+              estimatedDelivery: order.estimatedDelivery,
+              createdAt: order.createdAt,
+              shippingAddress: order.shippingAddress,
+              paymentMethod: order.paymentMethod,
+              items: order.items,
+            }}
+            showItems={false}
+            showAddress={false}
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Order items</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex items-center gap-4 border-b pb-4 last:border-b-0">
                   <img
                     src={item.image}
                     alt={item.name}
-                    className="w-20 h-20 object-cover rounded-lg"
+                    className="h-20 w-20 rounded-lg object-cover"
                   />
-                  <div className="flex-1">
-                    <h3 className="font-medium">{item.name}</h3>
-                    <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate font-medium">{item.name}</h3>
+                    <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
                   </div>
-                  <p className="text-lg font-bold">₵{item.price * item.quantity}</p>
+                  <p className="text-lg font-semibold">
+                    {formatPrice(item.price * item.quantity)}
+                  </p>
                 </div>
               ))}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* Shipping Address */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <FiMapPin className="text-xl text-pink-600" />
-              <h2 className="text-xl font-bold">Shipping Address</h2>
-            </div>
-            <div className="text-gray-700">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">
+                {order.fulfillmentType === 'pickup' ? 'Pickup details' : 'Shipping address'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 text-sm">
               <p className="font-medium">{order.shippingAddress.fullName}</p>
               <p>{order.shippingAddress.addressLine1}</p>
               {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
               <p>
-                {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pincode}
+                {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
+                {order.shippingAddress.pincode}
               </p>
               <p>{order.shippingAddress.country}</p>
-              <p className="mt-2">Phone: {order.shippingAddress.phone}</p>
-            </div>
-          </div>
+              <p className="pt-1">Phone: {order.shippingAddress.phone}</p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Order Summary */}
         <div className="md:col-span-1">
-          <div className="bg-white rounded-lg shadow-sm p-6 sticky top-20">
-            <h2 className="text-xl font-bold mb-4">Order Summary</h2>
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-gray-600">
+          <Card className="sticky top-20">
+            <CardHeader>
+              <CardTitle className="text-xl">Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span>₵{order.total}</span>
+                <span>{formatPrice(order.total)}</span>
               </div>
-              <div className="flex justify-between text-gray-600">
+              <div className="flex justify-between text-muted-foreground">
                 <span>Shipping</span>
                 <span>Free</span>
               </div>
-              <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span>₵{order.total}</span>
-                </div>
+              <div className="mt-2 flex justify-between border-t pt-2 text-base font-semibold">
+                <span>Total</span>
+                <span>{formatPrice(order.total)}</span>
               </div>
-            </div>
-
-            <div className="pt-4 border-t">
-              <div className="flex items-center gap-3 mb-2">
-                <FiCreditCard className="text-gray-500" />
-                <span className="text-sm text-gray-500">Payment Method</span>
+              <div className="mt-4 border-t pt-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Payment method
+                </p>
+                <p className="mt-1 font-medium">
+                  {getPaymentMethodLabel(
+                    order.paymentMethod,
+                    order.fulfillmentType ?? 'delivery'
+                  )}
+                </p>
               </div>
-              <p className="font-medium">
-                {order.paymentMethod === 'card' ? 'Credit/Debit Card' : 'Cash on Delivery'}
-              </p>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </div>
+    </PageTransition>
   )
 }
 

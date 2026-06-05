@@ -1,188 +1,206 @@
-'use client'
+"use client"
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/authStore'
-import { useProductStore } from '@/store/productStore'
-import { useOrderStore } from '@/store/orderStore'
-import Link from 'next/link'
-import { FiPackage, FiShoppingBag, FiUsers, FiDollarSign, FiTrendingUp, FiBox } from 'react-icons/fi'
-import { formatDate } from '@/lib/dateUtils'
+import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
+import { Search, TriangleAlert, Plus } from "lucide-react"
+
+import { AdminDashboardNav } from "@/components/admin/admin-dashboard-nav"
+import { PageTransition } from "@/components/layout/page-transition"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { formatPrice } from "@/lib/products/format"
+import { useAuthStore } from "@/store/authStore"
+import { useOrderStore } from "@/store/orderStore"
+import { useProductStore } from "@/store/productStore"
 
 export default function AdminDashboard() {
-  const router = useRouter()
-  const { isAuthenticated, isAdmin, user } = useAuthStore()
-  const { products, initializeProducts } = useProductStore()
-  const { orders, initializeOrders } = useOrderStore()
+  const { user } = useAuthStore()
+  const { products, initializeProducts, loading: productsLoading } = useProductStore()
+  const { orders, initializeOrders, loading: ordersLoading } = useOrderStore()
+  const [query, setQuery] = useState("")
+  const [activeCategory, setActiveCategory] = useState("ALL")
 
   useEffect(() => {
-    if (!isAuthenticated || !isAdmin) {
-      router.push('/account')
-      return
-    }
     initializeProducts()
     initializeOrders()
-  }, [isAuthenticated, isAdmin, router, initializeProducts, initializeOrders])
+  }, [initializeProducts, initializeOrders])
 
-  if (!isAuthenticated || !isAdmin) {
-    return null
-  }
+  const metrics = useMemo(() => {
+    const allOrders = orders ?? []
+    const allProducts = products ?? []
+    return {
+      orders: allOrders.length,
+      toFulfill: allOrders.filter((o) => ["pending", "confirmed"].includes(o?.status)).length,
+      lowStock: allProducts.filter((p) => p && p.stock > 0 && p.stock < 20).length,
+    }
+  }, [orders, products])
 
-  const totalRevenue = (orders || []).reduce((sum, order) => sum + (order?.total || 0), 0)
-  const totalOrders = (orders || []).length
-  const totalProducts = (products || []).length
-  const lowStockProducts = (products || []).filter((p) => p && p.stock < 20).length
-  const pendingOrders = (orders || []).filter((o) => o && o.status === 'pending').length
+  const loading = productsLoading || ordersLoading
+  const catalog = products ?? []
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const product of catalog) {
+      const key = (product.category || "Uncategorized").toUpperCase()
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+    return [
+      { label: "ALL", count: catalog.length },
+      ...Array.from(counts.entries()).map(([label, count]) => ({ label, count })),
+    ]
+  }, [catalog])
 
-  const stats = [
-    {
-      title: 'Total Revenue',
-      value: `₵${totalRevenue.toLocaleString()}`,
-      icon: FiDollarSign,
-      color: 'bg-green-500',
-    },
-    {
-      title: 'Total Orders',
-      value: totalOrders.toString(),
-      icon: FiShoppingBag,
-      color: 'bg-blue-500',
-    },
-    {
-      title: 'Total Products',
-      value: totalProducts.toString(),
-      icon: FiPackage,
-      color: 'bg-pink-500',
-    },
-    {
-      title: 'Low Stock',
-      value: lowStockProducts.toString(),
-      icon: FiTrendingUp,
-      color: 'bg-red-500',
-    },
-    {
-      title: 'Pending Orders',
-      value: pendingOrders.toString(),
-      icon: FiBox,
-      color: 'bg-yellow-500',
-    },
-  ]
+  const filteredProducts = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return catalog.filter((product) => {
+      const inCategory =
+        activeCategory === "ALL" ||
+        (product.category || "Uncategorized").toUpperCase() === activeCategory
+      if (!inCategory) return false
+      if (!q) return true
+      return (
+        product.name.toLowerCase().includes(q) ||
+        product.brand.toLowerCase().includes(q) ||
+        product.category.toLowerCase().includes(q)
+      )
+    })
+  }, [catalog, query, activeCategory])
+
+  const initials =
+    user?.name
+      ?.split(" ")
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "TM"
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-        <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">Welcome back, {user?.name}</p>
+    <PageTransition className="container-app py-4 md:py-8">
+      <section className="section-ash rounded-xl px-4 pb-6 pt-4 md:border md:border-pink-100">
+        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-brand text-3xl font-semibold text-white">
+          {initials}
         </div>
-        <Link
-          href="/"
-          className="text-sm sm:text-base text-pink-600 hover:underline"
-        >
-          View Store →
-        </Link>
-      </div>
+        <p className="label-editorial mt-4 text-center">Store Admin</p>
+        <h1 className="mt-1 text-center font-display text-4xl text-ink">{user?.name ?? "The Misfits"}</h1>
+        <p className="mt-1 text-center text-sm text-neutral-600">
+          {user?.email ?? "theemisfits1@gmail.com"}
+        </p>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon
-          return (
-            <div key={index} className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-2">
-                <div className={`${stat.color} p-3 rounded-lg`}>
-                  <Icon className="text-white text-xl" />
-                </div>
-              </div>
-              <h3 className="text-gray-600 text-sm mb-1">{stat.title}</h3>
-              <p className="text-2xl font-bold">{stat.value}</p>
-            </div>
-          )
-        })}
-      </div>
+        <div className="mx-auto mt-6 grid max-w-sm grid-cols-3 gap-3 text-center">
+          <Stat label="Orders" value={metrics.orders} />
+          <Stat label="To Fulfill" value={metrics.toFulfill} />
+          <Stat label="Low Stock" value={metrics.lowStock} />
+        </div>
+      </section>
 
-      {/* Quick Actions */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <Link
-          href="/admin/products"
-          className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
-        >
-          <FiPackage className="text-3xl text-pink-600 mb-4" />
-          <h2 className="text-xl font-bold mb-2">Manage Products</h2>
-          <p className="text-gray-600">Add, edit, or delete products</p>
-        </Link>
+      <AdminDashboardNav className="mt-4" />
 
-        <Link
-          href="/admin/inventory"
-          className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
-        >
-          <FiBox className="text-3xl text-pink-600 mb-4" />
-          <h2 className="text-xl font-bold mb-2">Inventory Management</h2>
-          <p className="text-gray-600">Track and update stock levels</p>
-        </Link>
+      <Card className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70">
+        <CardContent className="flex items-start gap-3 py-4">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+          <p className="text-sm text-amber-900">
+            Admin two-factor authentication is required.{" "}
+            <Link className="font-semibold underline" href="/admin/profile">
+              Set it up in Settings.
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
 
-        <Link
-          href="/admin/orders"
-          className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
-        >
-          <FiShoppingBag className="text-3xl text-pink-600 mb-4" />
-          <h2 className="text-xl font-bold mb-2">Manage Orders</h2>
-          <p className="text-gray-600">View and update order status</p>
-        </Link>
-      </div>
+      <section className="surface-card mt-4 p-4">
+        <h2 className="font-display text-4xl text-ink">Products</h2>
+        <p className="mt-1 text-sm text-neutral-600">
+          Manage your catalog — search, filter, and edit pieces.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            asChild
+            className="h-9 rounded-md bg-brand px-4 text-xs uppercase tracking-[0.08em] text-white hover:bg-brand-dark"
+          >
+            <Link href="/admin/products">
+              <Plus className="h-3.5 w-3.5" />
+              Add product
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="h-9 rounded-md border-pink-200 text-xs">
+            <Link href="/admin/products">Open full manager</Link>
+          </Button>
+        </div>
 
-      {/* Recent Orders */}
-      <div className="mt-6 sm:mt-8 bg-white rounded-lg shadow-sm p-4 sm:p-6">
-        <h2 className="text-lg sm:text-xl font-bold mb-4">Recent Orders</h2>
-        {(!orders || orders.length === 0) ? (
-          <p className="text-gray-500 text-sm sm:text-base">No orders yet</p>
-        ) : (
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
-            <div className="inline-block min-w-full align-middle">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700">Order ID</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 hidden sm:table-cell">Customer</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700">Total</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700">Status</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 hidden md:table-cell">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {(orders || []).slice(0, 5).map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm">
-                        <Link href={`/admin/orders/${order.id}`} className="text-pink-600 hover:underline font-mono">
-                          {order.id.length > 12 ? `${order.id.substring(0, 12)}...` : order.id}
-                        </Link>
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm hidden sm:table-cell">
-                        {order?.shippingAddress?.fullName || 'N/A'}
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
-                        ₵{order.total}
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                          order.status === 'shipped' ? 'bg-blue-100 text-blue-800' :
-                          order.status === 'confirmed' ? 'bg-pink-100 text-pink-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500 hidden md:table-cell">
-                        {formatDate(order.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="mt-4 border-b border-pink-100 pb-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search products..."
+              className="rounded-md border-pink-200 pl-9"
+            />
           </div>
-        )}
-      </div>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
+          {categories.map((category) => {
+            const active = activeCategory === category.label
+            return (
+              <button
+                key={category.label}
+                type="button"
+                onClick={() => setActiveCategory(category.label)}
+                className={
+                  active
+                    ? "shrink-0 rounded-md bg-brand px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
+                    : "shrink-0 rounded-md border border-pink-200 bg-brand-light px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] text-neutral-600"
+                }
+              >
+                {category.label} <span className="opacity-70">{category.count}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {loading ? (
+            <>
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </>
+          ) : filteredProducts.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
+              No products found for this filter.
+            </p>
+          ) : (
+            filteredProducts.slice(0, 8).map((product) => (
+              <Link
+                key={product.id}
+                href="/admin/products"
+                className="block rounded-lg border border-pink-100 bg-white p-3 transition-colors hover:bg-brand-light/50"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-ink">{product.name}</p>
+                    <p className="text-xs uppercase tracking-[0.08em] text-neutral-500">
+                      {product.category} · {product.brand}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-sm font-semibold text-ink">
+                    {formatPrice(product.price)}
+                  </p>
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+      </section>
+    </PageTransition>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <p className="text-2xl font-medium text-ink">{value}</p>
+      <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">{label}</p>
     </div>
   )
 }

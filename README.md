@@ -36,6 +36,13 @@ npm run dev
 
 3. Open [http://localhost:3000](http://localhost:3000) in your browser
 
+### Environment & deployment
+
+- Copy `.env.example` → `.env.local` and fill Supabase, Paystack, and BMS SMS keys
+- Database setup: `SETUP_DATABASE.md`
+- **Deploy on Vercel:** `DEPLOY_VERCEL.md`
+- Verify: `npm run verify-supabase` and `npm run verify-integrations`
+
 ## Project Structure
 
 ```

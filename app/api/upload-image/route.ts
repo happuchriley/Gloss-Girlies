@@ -2,9 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request.headers)
+    const limiter = checkRateLimit(`upload-image:${ip}`, 12, 60_000)
+    if (!limiter.allowed) {
+      return NextResponse.json(
+        { error: 'Too many uploads. Please wait before trying again.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(Math.ceil(limiter.retryAfterMs / 1000)) },
+        }
+      )
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
     const filename = formData.get('filename') as string || file.name
